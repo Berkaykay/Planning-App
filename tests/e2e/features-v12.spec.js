@@ -66,20 +66,30 @@ test('lessons are shown separately and never count as plans', async () => {
   await expect(page.getByTestId(`cell-${monday}`).locator('.cell-count')).toHaveText('0/1');
   await page.getByTestId(`cell-${monday}`).click();
   await expect(page.getByTestId('selected-day').getByTestId('lessons')).toBeVisible();
-  // The sidebar count for the category ignores lessons.
-  await expect(sidebar().getByRole('link', { name: /Okul/ })).toContainText('1');
+  // The sidebar count for the category includes its lessons (1 plan + 2 lessons).
+  await expect(sidebar().getByRole('link', { name: /Okul/ }).locator('.count')).toHaveText('3');
 });
 
-test('calendar day panel splits to-do and completed plans, and stamps completed days', async () => {
-  await start(normalizeData({ plans: [P({ id: 'a', title: 'Laundry', date: today }), P({ id: 'b', title: 'Bills', date: today, doneDates: [today] })] }));
+test('calendar day panel keeps plans in time order, and stamps completed days', async () => {
+  await start(
+    normalizeData({
+      plans: [
+        P({ id: 'a', title: 'Laundry', date: today, hour: 9 }),
+        P({ id: 'b', title: 'Bills', date: today, hour: 8, doneDates: [today] }),
+        P({ id: 'c', title: 'Gym', date: today, hour: 18 }),
+      ],
+    }),
+  );
   await sidebar().getByRole('link', { name: 'Calendar' }).click();
   const panel = page.getByTestId('selected-day');
-  await expect(panel.getByTestId('todo')).toContainText('Laundry');
-  await expect(panel.getByTestId('completed')).toContainText('Bills');
+  const titles = () => panel.getByTestId('plan').locator('.plan-title').allTextContents();
+  expect(await titles()).toEqual(['Bills', 'Laundry', 'Gym']);
+  // Checking a plan crosses it out in place: nothing moves.
   await panel.getByRole('checkbox', { name: 'Mark "Laundry" complete' }).click();
-  await expect(panel.getByTestId('completed')).toContainText('Laundry');
-  await expect(panel.getByTestId('todo')).toHaveCount(0);
-  await panel.getByRole('checkbox', { name: `Mark ${today} complete` }).click();
+  await expect(panel.getByTestId('plan').filter({ hasText: 'Laundry' })).toHaveClass(/done/);
+  expect(await titles()).toEqual(['Bills', 'Laundry', 'Gym']);
+  await panel.getByRole('checkbox', { name: 'Mark "Gym" complete' }).click();
+  // All plans done: the day is stamped automatically.
   await expect(page.getByTestId(`cell-${today}`).locator('.day-stamp')).toBeVisible();
   // The month stats stay pinned at the bottom of the window.
   const stats = await page.getByTestId('month-stats').boundingBox();
@@ -106,8 +116,9 @@ test('history shows past days, and unfinished plans can be moved to today (with 
   await expect(unfinished).toContainText('Read chapter 4');
   await unfinished.getByTestId('plan').filter({ hasText: 'Call the bank' }).locator('..').getByRole('button', { name: 'Move to today' }).click();
   await expect(page.locator('.today-card')).toContainText('Call the bank');
-  await expect(page.getByTestId('toast')).toContainText('Moved 1 plan');
-  await page.getByTestId('toast').getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('toast')).toHaveCount(0); // no pop-ups
+  await page.locator('body').click({ position: { x: 700, y: 120 } });
+  await page.keyboard.press('Control+z');
   await expect(page.locator('.today-card')).not.toContainText('Call the bank');
   await expect(unfinished).toContainText('Call the bank');
 
@@ -155,6 +166,10 @@ test('category page: customize icon, description and color; filter, search and s
   await expect.poll(() => readData(dataDir).categories[0].description).toBe('Life admin');
 
   const list = page.getByTestId('category-list');
+  // "All" is the default: every plan, done or not, in one list ordered by date.
+  await expect(page.getByRole('tab', { name: /All/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(list.getByTestId('plan').locator('.plan-title')).toHaveText(['Return library book', 'Renew passport', 'Buy gift', 'Book flights']);
+  await page.getByRole('tab', { name: /Upcoming/ }).click();
   await expect(list.getByTestId('plan')).toHaveCount(2); // upcoming
   await page.getByLabel('Search plans').fill('flight');
   await expect(list.getByTestId('plan')).toHaveCount(1);
@@ -169,10 +184,10 @@ test('category page: customize icon, description and color; filter, search and s
   await expect(list.getByTestId('plan').first()).toContainText('Book flights');
 });
 
-test('undo with Ctrl+Z and the Undo button', async () => {
-  await start(normalizeData({ plans: [P({ id: 'a', title: 'Water plants', date: today })] }));
+test('undo with Ctrl+Z and the right-click Undo', async () => {
+  await start(normalizeData({ plans: [P({ id: 'a', title: 'Water plants', date: today }), P({ id: 'b', title: 'Feed cat', date: today })] }));
   await check('Water plants').click();
-  await expect(page.getByTestId('toast')).toContainText('Completed "Water plants"');
+  await expect(page.getByTestId('toast')).toHaveCount(0);
   await page.locator('body').click({ position: { x: 600, y: 140 } });
   await page.keyboard.press('Control+z');
   await expect(check('Water plants')).toHaveAttribute('aria-checked', 'false');
@@ -182,9 +197,10 @@ test('undo with Ctrl+Z and the Undo button', async () => {
   await page.getByRole('button', { name: 'Delete "Water plants"' }).click();
   await dialog().getByRole('button', { name: 'Delete' }).click();
   await expect(plan('Water plants')).toHaveCount(0);
-  await page.getByTestId('toast').getByRole('button', { name: 'Undo' }).click();
+  await plan('Feed cat').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: /Undo/ }).click();
   await expect(plan('Water plants')).toBeVisible();
-  await expect.poll(() => readData(dataDir).plans.length).toBe(1);
+  await expect.poll(() => readData(dataDir).plans.length).toBe(2);
 });
 
 test('tabs: pin, close others, reopen closed tab, smooth dragging stays in the strip', async () => {

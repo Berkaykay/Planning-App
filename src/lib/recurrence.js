@@ -9,7 +9,7 @@
 // Completion is stored per occurrence in `doneDates`, so each day of a repeating
 // plan starts unchecked and past check marks stay as history.
 
-import { addDays, daysInMonth, fromKey, pad, weekday, weekStart, WEEKDAY_NAMES, WEEKDAY_ORDER, formatShort } from './dates.js';
+import { addDays, daysInMonth, fromKey, pad, toKey, weekday, weekStart, WEEKDAY_NAMES, WEEKDAY_ORDER, formatShort } from './dates.js';
 
 export const FREQUENCIES = ['daily', 'weekly', 'monthly'];
 
@@ -172,4 +172,67 @@ export function categoryStats(plans, categoryId, today) {
     upcoming: tasks.filter((p) => !p.repeat && p.date >= today && !isDone(p, p.date)).length,
     repeating: tasks.filter((p) => p.repeat).length,
   };
+}
+
+// Lessons check themselves once they are over, unless you marked yourself absent.
+const DEFAULT_LESSON_MINUTES = 45;
+export function lessonAttended(plan, date, now = new Date()) {
+  if (plan.absentDates?.includes(date)) return false;
+  if (plan.doneDates.includes(date)) return true;
+  const today = toKey(now);
+  if (date !== today) return date < today;
+  const end = (plan.hour ?? 0) * 60 + (plan.minute ?? 0) + (plan.duration ?? DEFAULT_LESSON_MINUTES);
+  return now.getHours() * 60 + now.getMinutes() >= end;
+}
+
+// First date on or after `from` when the plan happens (null if none within `limit` days).
+export function nextOccurrence(plan, from, limit = 400) {
+  if (!plan.repeat) return plan.date >= from ? plan.date : null;
+  let date = plan.date > from ? plan.date : from;
+  for (let i = 0; i < limit; i++, date = addDays(date, 1)) {
+    if (plan.repeat.until && date > plan.repeat.until) return null;
+    if (occursOn(plan, date)) return date;
+  }
+  return null;
+}
+
+// Every plan of a category as { plan, date }: one-off plans on their date, repeating plans on
+// their next date (or their start date if they have ended). Sorted by date, then time.
+export function categoryAll(plans, categoryId, today) {
+  return plans
+    .filter((p) => p.categoryId === categoryId && !isLesson(p))
+    .map((plan) => ({ plan, date: plan.repeat ? nextOccurrence(plan, today) ?? plan.date : plan.date }))
+    .sort((a, b) => (a.date === b.date ? comparePlans(a.plan, b.plan) : a.date < b.date ? -1 : 1));
+}
+
+const startOf = (p) => p.hour * 60 + (p.minute ?? 0);
+const endOf = (p) => startOf(p) + (p.duration ?? 30);
+
+// Layout for the week view: per day, all-day items and timed blocks (with side-by-side lanes
+// for overlapping blocks), plus the hour range to show (07-22 unless plans fall outside).
+export function weekLayout(plans, start) {
+  let fromHour = 7;
+  let toHour = 22;
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(start, i);
+    const list = plansOn(plans, date);
+    const timed = list.filter((p) => p.hour !== null);
+    const blocks = [];
+    const laneEnds = [];
+    for (const p of timed) {
+      fromHour = Math.min(fromHour, p.hour);
+      toHour = Math.max(toHour, Math.ceil(endOf(p) / 60));
+      let lane = laneEnds.findIndex((end) => end <= startOf(p));
+      if (lane === -1) lane = laneEnds.length;
+      laneEnds[lane] = endOf(p);
+      blocks.push({ plan: p, start: startOf(p), end: endOf(p), lane });
+    }
+    // Blocks that overlap share the width of their busiest group.
+    for (const b of blocks) {
+      const overlapping = blocks.filter((o) => o.start < b.end && b.start < o.end);
+      b.lanes = Math.max(...overlapping.map((o) => o.lane)) + 1;
+    }
+    return { date, allDay: list.filter((p) => p.hour === null), blocks };
+  });
+  return { days, fromHour, toHour: Math.min(24, toHour) };
 }

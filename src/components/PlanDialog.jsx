@@ -11,6 +11,8 @@ export default function PlanDialog({ categories, initial, occurrenceDate, onClos
   const [scope, setScope] = useState('all');
   const [title, setTitle] = useState(initial.title ?? '');
   const [notes, setNotes] = useState(initial.notes ?? '');
+  const [checklist, setChecklist] = useState(initial.checklist ?? []);
+  const [newItem, setNewItem] = useState('');
   const [date, setDate] = useState(isSeries && scope === 'one' ? occurrenceDate : initial.date);
   const timed = initial.hour !== null && initial.hour !== undefined;
   const startMinutes = timed ? initial.hour * 60 + (initial.minute ?? 0) : null;
@@ -58,7 +60,8 @@ export default function PlanDialog({ categories, initial, occurrenceDate, onClos
       if (until && until < date) return setError('The end date must be after the start date.');
       repeat = { freq, weekdays: freq === 'weekly' ? weekdays : undefined, until: until || null };
     }
-    const values = { title: title.trim(), notes, date, ...time, categoryId: categoryId || null };
+    const items = newItem.trim() ? [...checklist, { text: newItem.trim() }] : checklist;
+    const values = { title: title.trim(), notes, date, ...time, categoryId: categoryId || null, checklist: items };
     if (!onlyThisDay) values.repeat = repeat;
     onClose({ values, scope });
   };
@@ -184,6 +187,38 @@ export default function PlanDialog({ categories, initial, occurrenceDate, onClos
           )}
         </div>
       )}
+      <div className="field checklist-editor">
+        <span>Checklist</span>
+        {checklist.length > 0 && (
+          <ul>
+            {checklist.map((item, i) => (
+              <li key={item.id ?? i}>
+                <span>☐ {item.text}</span>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={`Remove "${item.text}"`}
+                  onClick={() => setChecklist(checklist.filter((_, j) => j !== i))}
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <input
+          aria-label="Add checklist item"
+          placeholder="Add a sub-task and press Enter"
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            if (newItem.trim()) setChecklist([...checklist, { text: newItem.trim() }]);
+            setNewItem('');
+          }}
+        />
+      </div>
       <label className="field">
         <span>Notes</span>
         <textarea rows={3} aria-label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional details" />

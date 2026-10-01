@@ -2,13 +2,14 @@ import React from 'react';
 import { useApp } from '../context.js';
 import { newId } from '../lib/store.js';
 import { isDone } from '../lib/recurrence.js';
-import { formatMedium, formatTimeRange } from '../lib/dates.js';
+import { addDays, formatMedium, formatTimeRange, weekStart } from '../lib/dates.js';
 import PlanDialog from './PlanDialog.jsx';
+import { DatePromptDialog } from './Dialogs.jsx';
 
 // Shared add / edit / move / delete / complete behavior for plans, used by every page.
 // For repeating plans, the user is asked whether a change applies to one day or the whole series.
 export function usePlanActions() {
-  const { state, dispatch, dialogs, today } = useApp();
+  const { state, dispatch, dialogs, today, menu } = useApp();
 
   const askScope = (plan, verb, date) =>
     dialogs.choose({
@@ -20,7 +21,7 @@ export function usePlanActions() {
       ],
     });
 
-  return {
+  const actions = {
     toggle(plan, date) {
       dispatch({ type: 'plan/setDone', id: plan.id, date, done: !isDone(plan, date) });
     },
@@ -94,5 +95,47 @@ export function usePlanActions() {
     setCategory(plan, categoryId) {
       dispatch({ type: 'plan/update', id: plan.id, changes: { categoryId } });
     },
+
+    copy(plan, dates) {
+      if (dates.length) dispatch({ type: 'plan/copy', id: plan.id, dates });
+    },
+
+    // Right-click menu for one occurrence (`date`) of a plan.
+    openMenu(e, plan, date) {
+      const done = isDone(plan, date);
+      const tomorrow = addDays(today, 1);
+      const week = Array.from({ length: 7 }, (_, i) => addDays(weekStart(date), i)).filter((d) => d !== date);
+      menu.open(e, [
+        { label: done ? 'Mark as not done' : 'Mark as done', onSelect: () => actions.toggle(plan, date) },
+        { label: 'Edit…', onSelect: () => actions.edit(plan, date) },
+        null,
+        { label: 'Duplicate', onSelect: () => actions.copy(plan, [date]) },
+        { label: 'Copy to tomorrow', onSelect: () => actions.copy(plan, [addDays(date, 1)]) },
+        {
+          label: 'Copy to date…',
+          onSelect: async () => {
+            const target = await dialogs.open((close) => (
+              <DatePromptDialog title={`Copy "${plan.title}"`} label="Copy to" initial={addDays(date, 1)} confirmLabel="Copy" onClose={close} />
+            ));
+            if (target) actions.copy(plan, [target]);
+          },
+        },
+        { label: 'Copy to every day this week', onSelect: () => actions.copy(plan, week) },
+        null,
+        { label: 'Move to today', disabled: date === today, onSelect: () => actions.move(plan, date, { date: today, hour: plan.hour }) },
+        { label: 'Move to tomorrow', disabled: date === tomorrow, onSelect: () => actions.move(plan, date, { date: tomorrow, hour: plan.hour }) },
+        {
+          label: 'Category',
+          children: [
+            { label: 'No category', checked: !plan.categoryId, onSelect: () => actions.setCategory(plan, null) },
+            ...state.categories.map((c) => ({ label: c.name, checked: plan.categoryId === c.id, onSelect: () => actions.setCategory(plan, c.id) })),
+          ],
+        },
+        null,
+        { label: 'Delete…', danger: true, onSelect: () => actions.remove(plan, date) },
+        { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: () => dispatch({ type: 'history/undo' }) },
+      ]);
+    },
   };
+  return actions;
 }

@@ -19,11 +19,14 @@ import Check, { DayStamp } from '../components/Check.jsx';
 import PlanItem from '../components/PlanItem.jsx';
 import LessonStrip from '../components/LessonStrip.jsx';
 import { Progress, QuickAdd } from './DayPlanner.jsx';
+import { dropAttr } from '../components/dragDrop.jsx';
+import { usePlanActions } from '../components/planActions.jsx';
 
 const MAX_DOTS = 6;
 
 export default function Calendar({ month }) {
-  const { state, navigate, today } = useApp();
+  const { state, dispatch, navigate, today, menu } = useApp();
+  const actions = usePlanActions();
   // Clicking a day selects it and shows it in the side panel; double-click opens the Day Planner.
   const [selected, setSelected] = useState(monthOf(today) === month ? today : `${month}-01`);
   // Stamps only animate for days completed while this page is open.
@@ -33,6 +36,20 @@ export default function Calendar({ month }) {
 
   const openDay = (date, e) =>
     navigate(paths.day(date), { newTab: Boolean(e?.ctrlKey || e?.metaKey), background: true });
+
+  const dayMenu = (e, date) => {
+    const done = Boolean(state.days[date]?.done);
+    menu.open(e, [
+      { label: 'Open in Day Planner', onSelect: () => openDay(date) },
+      { label: 'Open in new tab', onSelect: () => navigate(paths.day(date), { newTab: true }) },
+      { label: 'Open week', onSelect: () => navigate(paths.week(date)) },
+      null,
+      { label: 'Add plan…', onSelect: () => actions.create({ date }) },
+      { label: done ? 'Mark day as not complete' : 'Mark day complete', onSelect: () => dispatch({ type: 'day/setDone', date, done: !done }) },
+      null,
+      { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: () => dispatch({ type: 'history/undo' }) },
+    ]);
+  };
 
   return (
     <div className="calendar-page">
@@ -47,6 +64,9 @@ export default function Calendar({ month }) {
           </Link>
           <Link to={paths.calendar(monthOf(today))} className={`button this-month ${month === monthOf(today) ? 'current' : ''}`}>
             This month
+          </Link>
+          <Link to={paths.week(selected)} className="button" title="Show the selected day's week">
+            Week view
           </Link>
         </div>
       </header>
@@ -84,6 +104,8 @@ export default function Calendar({ month }) {
                   aria-label={`${formatLong(date)}: ${plans.length ? `${done} of ${plans.length} plans done` : 'no plans'}${dayDone ? ', day complete' : ''}`}
                   tabIndex={0}
                   data-testid={`cell-${date}`}
+                  data-drop={dropAttr({ kind: 'day', date })}
+                  onContextMenu={(e) => dayMenu(e, date)}
                   onClick={(e) => (e.ctrlKey || e.metaKey ? openDay(date, e) : setSelected(date))}
                   onDoubleClick={() => openDay(date)}
                   onAuxClick={(e) => e.button === 1 && openDay(date, { ctrlKey: true })}
@@ -130,8 +152,8 @@ export default function Calendar({ month }) {
 
 function SelectedDay({ date, onOpen }) {
   const { state, dispatch, today } = useApp();
+  // One list in time order: checking a plan crosses it out in place, so nothing jumps around.
   const plans = tasksOn(state.plans, date);
-  const todo = plans.filter((p) => !isDone(p, date));
   const completed = plans.filter((p) => isDone(p, date));
   const dayDone = Boolean(state.days[date]?.done);
   return (
@@ -149,21 +171,11 @@ function SelectedDay({ date, onOpen }) {
       {plans.length > 0 && <Progress done={completed.length} total={plans.length} />}
       <div className="selected-body">
         <LessonStrip date={date} compact />
-        {todo.length > 0 && (
-          <div className="plan-group" data-testid="todo">
-            <div className="section-label">To do · {todo.length}</div>
+        {plans.length > 0 && (
+          <div className="plan-group" data-testid="day-plans">
+            <div className="section-label">Plans · {plans.length}</div>
             <div className="plan-list">
-              {todo.map((p) => (
-                <PlanItem key={p.id} plan={p} date={date} />
-              ))}
-            </div>
-          </div>
-        )}
-        {completed.length > 0 && (
-          <div className="plan-group" data-testid="completed">
-            <div className="section-label">Completed · {completed.length}</div>
-            <div className="plan-list">
-              {completed.map((p) => (
+              {plans.map((p) => (
                 <PlanItem key={p.id} plan={p} date={date} />
               ))}
             </div>

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AppContext } from './context.js';
 import { normalizeData, activeTab, currentPath, DATA_VERSION } from './lib/store.js';
-import { historyReducer, initHistory, describeChange } from './lib/history.js';
-import { plansOn, isDone, isLesson } from './lib/recurrence.js';
+import { historyReducer, initHistory } from './lib/history.js';
+import { plansOn, isDone, isLesson, lessonAttended } from './lib/recurrence.js';
 import { formatTimeRange } from './lib/dates.js';
 import { loadData, saveData, onAppCommand } from './lib/persistence.js';
 import { parseRoute, paths } from './lib/routes.js';
@@ -18,6 +18,10 @@ import Categories from './pages/Categories.jsx';
 import CategoryPage from './pages/CategoryPage.jsx';
 import Timetable from './pages/Timetable.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { ContextMenu, useContextMenuState } from './components/ContextMenu.jsx';
+import { DragProvider } from './components/dragDrop.jsx';
+import { usePlanActions } from './components/planActions.jsx';
+import Week from './pages/Week.jsx';
 import NotFound from './pages/NotFound.jsx';
 import History from './pages/History.jsx';
 import Settings from './pages/Settings.jsx';
@@ -63,7 +67,7 @@ function useReminders(plans, reminders) {
       const date = todayKey();
       const minutesNow = now.getHours() * 60 + now.getMinutes();
       for (const p of plansOn(plans, date)) {
-        if (p.hour === null || isDone(p, date) || (isLesson(p) && !reminders.lessons)) continue;
+        if (p.hour === null || (isLesson(p) ? !reminders.lessons || lessonAttended(p, date, now) : isDone(p, date))) continue;
         const lead = p.hour * 60 + p.minute - minutesNow;
         const key = `${p.id}:${date}`;
         if (lead < 0 || lead > reminders.minutes || notified.current.has(key)) continue;
@@ -79,27 +83,15 @@ function useReminders(plans, reminders) {
   }, [plans, reminders]);
 }
 
-// "Completed … · Undo" message at the bottom of the window.
-function Toast({ toast, onUndo, onClose }) {
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timer = setTimeout(onClose, 5000);
-    return () => clearTimeout(timer);
-  }, [toast, onClose]);
-  if (!toast) return null;
-  return (
-    <div className="toast" role="status" data-testid="toast" key={toast.id}>
-      <span>{toast.message}</span>
-      {toast.canUndo && (
-        <button className="link-button" onClick={onUndo}>
-          Undo
-        </button>
-      )}
-      <button className="icon-button" aria-label="Dismiss" onClick={onClose}>
-        ✕
-      </button>
-    </div>
-  );
+// Handles dropping a dragged plan on an hour, a day or a category.
+function PlanDragLayer({ children }) {
+  const actions = usePlanActions();
+  const onDrop = (plan, date, target) => {
+    if (target.kind === 'slot') actions.move(plan, date, { date: target.date, hour: target.hour });
+    else if (target.kind === 'day') actions.move(plan, date, { date: target.date, hour: plan.hour });
+    else if (target.kind === 'category') actions.setCategory(plan, target.id);
+  };
+  return <DragProvider onDrop={onDrop}>{children}</DragProvider>;
 }
 
 const isEditable = (el) => el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
@@ -108,10 +100,12 @@ function Planner({ initial, readOnly }) {
   const [history, dispatch] = useReducer(historyReducer, initial, initHistory);
   const state = history.data;
   const [saveError, setSaveError] = useState(null);
-  const [toast, setToast] = useState(null);
-  const closeToast = useCallback(() => setToast(null), []);
   const today = useToday();
   const dialogs = useDialogState();
+  const menuState = useContextMenuState();
+  const { menu: openMenuState, close: closeMenu } = menuState;
+  // Stable object so the context value doesn't change when the menu opens or closes.
+  const menu = useMemo(() => ({ open: menuState.open, close: closeMenu }), []); // eslint-disable-line react-hooks/exhaustive-deps
   const addressRef = useRef(null);
 
   // Light / dark / follow-the-system theme (see the [data-theme] rules in styles.css).
@@ -120,12 +114,6 @@ function Planner({ initial, readOnly }) {
   }, [state.settings.theme]);
 
   useReminders(state.plans, state.settings.reminders);
-
-  // Offer "Undo" after deleting, completing or moving things.
-  useEffect(() => {
-    const message = describeChange(history.last);
-    if (message) setToast({ id: history.seq, message, canUndo: !history.last.type.startsWith('history/') });
-  }, [history.seq]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Save every change. Saves are processed in order by the main process.
   useEffect(() => {
@@ -239,8 +227,8 @@ function Planner({ initial, readOnly }) {
   }, [runCommand, dialogs.isOpen]);
 
   const ctx = useMemo(
-    () => ({ state, dispatch, navigate, route, path, today, dialogs }),
-    [state, navigate, route, path, today, dialogs],
+    () => ({ state, dispatch, navigate, route, path, today, dialogs, menu }),
+    [state, navigate, route, path, today, dialogs, menu],
   );
 
   let page;
@@ -263,6 +251,9 @@ function Planner({ initial, readOnly }) {
     case 'history':
       page = <History />;
       break;
+    case 'week':
+      page = <Week start={route.start} />;
+      break;
     case 'settings':
       page = <Settings />;
       break;
@@ -275,51 +266,53 @@ function Planner({ initial, readOnly }) {
 
   return (
     <AppContext.Provider value={ctx}>
-      <div className="app">
-        <TabBar />
-        <NavBar addressRef={addressRef} />
-        <div className="workspace">
-          <Sidebar />
-          {/* Keyed by tab + history position so each page starts fresh, like a browser load. */}
-          <main className="page" key={`${tab.id}:${tab.index}:${path}`} data-testid="page">
-            <ErrorBoundary
-              resetKey={path}
-              onBack={tab.index > 0 ? () => dispatch({ type: 'tab/back' }) : null}
-              onHome={() => navigate(paths.dashboard())}
-            >
-              {page}
-            </ErrorBoundary>
-          </main>
-        </div>
-        {saveError && <div className="save-error">Could not save your changes: {saveError}</div>}
-        {readOnly && (
-          <div className="save-error">
-            Your data was saved by a newer version of Planner, so this older version won't change it. Install the latest
-            version to keep planning.
+      <PlanDragLayer>
+        <div className="app">
+          <TabBar />
+          <NavBar addressRef={addressRef} />
+          <div className="workspace">
+            <Sidebar />
+            {/* Keyed by tab + history position so each page starts fresh, like a browser load. */}
+            <main className="page" key={`${tab.id}:${tab.index}:${path}`} data-testid="page">
+              <ErrorBoundary
+                resetKey={path}
+                onBack={tab.index > 0 ? () => dispatch({ type: 'tab/back' }) : null}
+                onHome={() => navigate(paths.dashboard())}
+              >
+                {page}
+              </ErrorBoundary>
+            </main>
           </div>
-        )}
-        <Toast toast={toast} onClose={closeToast} onUndo={() => dispatch({ type: 'history/undo' })} />
-      </div>
-      <ErrorBoundary
-        resetKey={dialogs.current}
-        renderFallback={(error) => (
-          <div className="modal-backdrop">
-            <div className="modal modal-small" role="alertdialog" aria-label="Something went wrong">
-              <div className="modal-body">
-                <h2>Something went wrong</h2>
-                <p className="subtle">{String(error.message || error)}</p>
-              </div>
-              <footer className="modal-footer">
-                <button className="primary" onClick={() => dialogs.current?.close(null)}>
-                  Close
-                </button>
-              </footer>
+          {saveError && <div className="save-error">Could not save your changes: {saveError}</div>}
+          {readOnly && (
+            <div className="save-error">
+              Your data was saved by a newer version of Planner, so this older version won't change it. Install the latest
+              version to keep planning.
             </div>
-          </div>
-        )}
-      >
-        <DialogHost dialogs={dialogs} />
-      </ErrorBoundary>
+          )}
+        </div>
+        <ErrorBoundary
+          resetKey={dialogs.current}
+          renderFallback={(error) => (
+            <div className="modal-backdrop">
+              <div className="modal modal-small" role="alertdialog" aria-label="Something went wrong">
+                <div className="modal-body">
+                  <h2>Something went wrong</h2>
+                  <p className="subtle">{String(error.message || error)}</p>
+                </div>
+                <footer className="modal-footer">
+                  <button className="primary" onClick={() => dialogs.current?.close(null)}>
+                    Close
+                  </button>
+                </footer>
+              </div>
+            </div>
+          )}
+        >
+          <DialogHost dialogs={dialogs} />
+        </ErrorBoundary>
+        <ContextMenu menu={openMenuState} onClose={closeMenu} />
+      </PlanDragLayer>
     </AppContext.Provider>
   );
 }

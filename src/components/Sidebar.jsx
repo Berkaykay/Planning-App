@@ -3,7 +3,7 @@ import { useApp } from '../context.js';
 import { paths } from '../lib/routes.js';
 import { THEMES } from '../lib/store.js';
 import Link from './Link.jsx';
-import { PLAN_DRAG_TYPE } from './PlanItem.jsx';
+import { dropAttr } from './dragDrop.jsx';
 import { useCategoryActions, CategoryNameInput } from './categoryActions.jsx';
 
 export default function Sidebar() {
@@ -13,13 +13,14 @@ export default function Sidebar() {
   const [renamingId, setRenamingId] = useState(null);
 
   const counts = {};
-  // Lessons aren't plans, so they don't count here.
-  for (const p of state.plans) if (p.categoryId && !p.timetableId) counts[p.categoryId] = (counts[p.categoryId] ?? 0) + 1;
+  // Plans and timetable lessons of each category.
+  for (const p of state.plans) if (p.categoryId) counts[p.categoryId] = (counts[p.categoryId] ?? 0) + 1;
 
   const pages = [
     { to: paths.dashboard(), label: 'Dashboard', icon: '◧', active: route.page === 'dashboard' },
     { to: paths.calendar(), label: 'Calendar', icon: '▦', active: route.page === 'calendar' },
     { to: paths.day(today), label: 'Day Planner', icon: '☰', active: route.page === 'day' },
+    { to: paths.week(), label: 'Week', icon: '▥', active: route.page === 'week' },
     { to: paths.timetable(), label: 'Timetable', icon: '▤', active: route.page === 'timetable' },
     { to: paths.history(), label: 'History', icon: '↺', active: route.page === 'history' },
     { to: paths.categories(), label: 'Categories', icon: '◉', active: route.page === 'categories' },
@@ -101,25 +102,17 @@ export default function Sidebar() {
 }
 
 function CategoryRow({ category, count, selected, renaming, onRenameStart, onRenameEnd, actions }) {
-  const { state, dispatch } = useApp();
-  const [dropping, setDropping] = useState(false);
-
-  // Drop a plan on a category to assign it.
-  const onDragOver = (e) => {
-    if (!e.dataTransfer.types.includes(PLAN_DRAG_TYPE)) return;
-    e.preventDefault();
-    setDropping(true);
-  };
-  const onDrop = (e) => {
-    setDropping(false);
-    const data = e.dataTransfer.getData(PLAN_DRAG_TYPE);
-    if (!data) return;
-    e.preventDefault();
-    const { id } = JSON.parse(data);
-    if (state.plans.some((p) => p.id === id)) {
-      dispatch({ type: 'plan/update', id, changes: { categoryId: category.id } });
-    }
-  };
+  const { navigate, menu } = useApp();
+  const openMenu = (e) =>
+    menu.open(e, [
+      { label: 'Open', onSelect: () => navigate(paths.category(category.id)) },
+      { label: 'Open in new tab', onSelect: () => navigate(paths.category(category.id), { newTab: true }) },
+      null,
+      { label: 'Rename', onSelect: onRenameStart },
+      { label: 'Customize icon and color…', onSelect: () => navigate(paths.category(category.id)) },
+      null,
+      { label: 'Delete…', danger: true, onSelect: () => actions.remove(category) },
+    ]);
 
   if (renaming) {
     return (
@@ -138,10 +131,9 @@ function CategoryRow({ category, count, selected, renaming, onRenameStart, onRen
 
   return (
     <li
-      className={`category-row ${selected ? 'selected' : ''} ${dropping ? 'drop-target' : ''}`}
-      onDragOver={onDragOver}
-      onDragLeave={() => setDropping(false)}
-      onDrop={onDrop}
+      className={`category-row ${selected ? 'selected' : ''}`}
+      data-drop={dropAttr({ kind: 'category', id: category.id })}
+      onContextMenu={openMenu}
       onDoubleClick={onRenameStart}
       data-testid="category-row"
     >

@@ -2,9 +2,9 @@
 // The whole object is saved to disk after every change.
 import { isDateKey, parseTime } from './dates.js';
 import { HOME } from './routes.js';
-import { FREQUENCIES } from './recurrence.js';
+import { FREQUENCIES, tasksOn, isDone } from './recurrence.js';
 
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 const MAX_HISTORY = 100;
 
 // Muted colors: categories show up as small dots and thin markers, not big colored areas.
@@ -76,6 +76,16 @@ export function normalizePlan(raw) {
     repeat: normalizeRepeat(raw.repeat),
     doneDates: Array.isArray(raw.doneDates) ? raw.doneDates.filter(isDateKey) : [],
     skipDates: Array.isArray(raw.skipDates) ? raw.skipDates.filter(isDateKey) : [],
+    // Lessons: days you marked yourself absent (otherwise a lesson counts as attended once it's over).
+    absentDates: Array.isArray(raw.absentDates) ? raw.absentDates.filter(isDateKey) : [],
+    // Small sub-tasks; each remembers on which dates (occurrences) it was ticked.
+    checklist: (Array.isArray(raw.checklist) ? raw.checklist : [])
+      .filter((item) => item && typeof item.text === 'string' && item.text.trim())
+      .map((item) => ({
+        id: item.id || newId(),
+        text: item.text.trim(),
+        doneDates: Array.isArray(item.doneDates) ? item.doneDates.filter(isDateKey) : [],
+      })),
     createdAt: raw.createdAt || new Date().toISOString(),
     // Plans generated from a timetable remember which timetable cell they came from.
     ...(raw.timetableId && { timetableId: raw.timetableId, timetableKey: raw.timetableKey }),
@@ -226,6 +236,23 @@ function applyPlanChanges(plan, changes) {
   return next;
 }
 
+// Keeps a day's check mark in step with its plans (lessons don't count): a day with plans is
+// complete exactly when all of them are done.
+function syncDay(state, date) {
+  const tasks = tasksOn(state.plans, date);
+  if (!tasks.length) return state;
+  const allDone = tasks.every((p) => isDone(p, date));
+  if (allDone === Boolean(state.days[date]?.done)) return state;
+  const days = { ...state.days };
+  if (allDone) days[date] = { done: true };
+  else delete days[date];
+  return { ...state, days };
+}
+
+function setDoneOn(plan, date, done) {
+  return { ...plan, doneDates: done ? withValue(plan.doneDates, date) : without(plan.doneDates, date) };
+}
+
 // Closes tabs, remembering them for "Reopen closed tab". `keepActive` stays selected if given.
 function closeTabs(state, ids, keepActive) {
   const { tabs, activeTabId } = state.session;
@@ -286,8 +313,50 @@ export function reducer(state, action) {
       };
 
     // ---- Plans ------------------------------------------------------------
-    case 'plan/add':
-      return { ...state, plans: [...state.plans, normalizePlan(action.plan)] };
+    case 'plan/add': {
+      const plan = normalizePlan(action.plan);
+      const next = { ...state, plans: [...state.plans, plan] };
+      return plan.repeat ? next : syncDay(next, plan.date);
+    }
+    case 'plan/copy': {
+      // Unchecked one-off copies of a plan on other dates.
+      const source = state.plans.find((p) => p.id === action.id);
+      if (!source) return state;
+      const copies = action.dates.map((date, i) =>
+        normalizePlan({
+          ...source,
+          id: action.newIds?.[i] ?? newId(),
+          date,
+          repeat: null,
+          timetableId: null,
+          doneDates: [],
+          skipDates: [],
+          absentDates: [],
+          createdAt: undefined,
+          checklist: source.checklist.map((item) => ({ text: item.text })),
+        }),
+      );
+      return action.dates.reduce(syncDay, { ...state, plans: [...state.plans, ...copies] });
+    }
+    case 'plan/checkItem': {
+      // Ticking the last item completes the plan; unticking one makes it not done again.
+      const next = updatePlan(state, action.id, (p) => {
+        const checklist = p.checklist.map((item) =>
+          item.id === action.itemId
+            ? { ...item, doneDates: action.done ? withValue(item.doneDates, action.date) : without(item.doneDates, action.date) }
+            : item,
+        );
+        const allDone = checklist.length > 0 && checklist.every((item) => item.doneDates.includes(action.date));
+        return setDoneOn({ ...p, checklist }, action.date, allDone);
+      });
+      return syncDay(next, action.date);
+    }
+    case 'lesson/setAttended':
+      return updatePlan(state, action.id, (p) => ({
+        ...p,
+        doneDates: action.attended ? withValue(p.doneDates, action.date) : without(p.doneDates, action.date),
+        absentDates: action.attended ? without(p.absentDates, action.date) : withValue(p.absentDates, action.date),
+      }));
     case 'plan/update':
       return updatePlan(state, action.id, (p) => applyPlanChanges(p, action.changes));
     case 'plan/delete':
@@ -330,18 +399,24 @@ export function reducer(state, action) {
         plans: state.plans.map((p) => (ids.has(p.id) && !p.repeat ? applyPlanChanges(p, { date: action.date }) : p)),
       };
     }
-    case 'plan/setDone':
-      return updatePlan(state, action.id, (p) => ({
-        ...p,
-        doneDates: action.done ? withValue(p.doneDates, action.date) : without(p.doneDates, action.date),
-      }));
+    case 'plan/setDone': {
+      const next = updatePlan(state, action.id, (p) => setDoneOn(p, action.date, action.done));
+      const plan = next.plans.find((p) => p.id === action.id);
+      return plan?.timetableId ? next : syncDay(next, action.date);
+    }
 
     // ---- Whole days -------------------------------------------------------
     case 'day/setDone': {
+      // Checking or unchecking a day does the same to all of its plans (not lessons).
       const days = { ...state.days };
       if (action.done) days[action.date] = { done: true };
       else delete days[action.date];
-      return { ...state, days };
+      const ids = new Set(tasksOn(state.plans, action.date).map((p) => p.id));
+      return {
+        ...state,
+        days,
+        plans: state.plans.map((p) => (ids.has(p.id) ? setDoneOn(p, action.date, action.done) : p)),
+      };
     }
 
     // ---- Timetables -------------------------------------------------------

@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useApp } from '../context.js';
 import { currentPath } from '../lib/store.js';
 import { parseRoute, routeTitle, routeIcon, paths } from '../lib/routes.js';
@@ -8,13 +8,12 @@ const DRAG_THRESHOLD = 5;
 // Browser-style tab strip. Tabs are dragged along the strip (never out of it): the other tabs
 // slide aside, and when released every tab glides to its new place.
 export default function TabBar() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, menu } = useApp();
   const { tabs, activeTabId } = state.session;
   const stripRef = useRef(null);
   const tabRefs = useRef(new Map());
   const lastRects = useRef(new Map());
   const [drag, setDrag] = useState(null);
-  const [menu, setMenu] = useState(null);
 
   // FLIP animation: whenever tabs move (reorder, open, close), slide them from where they were
   // last seen to their new place. While dragging, React positions the tabs instead.
@@ -133,10 +132,7 @@ export default function TabBar() {
             onPointerUp={endDrag}
             onPointerCancel={() => setDrag(null)}
             onAuxClick={(e) => e.button === 1 && dispatch({ type: 'tab/close', id: tab.id })}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setMenu({ id: tab.id, x: e.clientX, y: e.clientY });
-            }}
+            onContextMenu={(e) => menu.open(e, tabMenuItems(tab, state, dispatch))}
           >
             <span className="tab-icon" aria-hidden>
               {routeIcon(route)}
@@ -158,61 +154,22 @@ export default function TabBar() {
       <button className="new-tab" aria-label="New tab" title="New tab (Ctrl+T)" onClick={() => dispatch({ type: 'tab/open', path: paths.dashboard() })}>
         +
       </button>
-      {menu && <TabMenu menu={menu} onClose={() => setMenu(null)} />}
     </div>
   );
 }
 
-function TabMenu({ menu, onClose }) {
-  const { state, dispatch } = useApp();
-  const ref = useRef(null);
-  const tab = state.session.tabs.find((t) => t.id === menu.id);
-  const index = state.session.tabs.indexOf(tab);
-
-  useEffect(() => {
-    const onDown = (e) => !ref.current?.contains(e.target) && onClose();
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('pointerdown', onDown, true);
-    window.addEventListener('keydown', onKey, true);
-    ref.current?.querySelector('button')?.focus();
-    return () => {
-      window.removeEventListener('pointerdown', onDown, true);
-      window.removeEventListener('keydown', onKey, true);
-    };
-  }, [onClose]);
-
-  if (!tab) return null;
-  const items = [
-    { label: 'New tab to the right', action: { type: 'tab/open', path: paths.dashboard(), afterId: tab.id } },
-    { label: 'Duplicate', action: { type: 'tab/duplicate', id: tab.id } },
-    { label: tab.pinned ? 'Unpin' : 'Pin', action: { type: 'tab/pin', id: tab.id, pinned: !tab.pinned } },
+function tabMenuItems(tab, state, dispatch) {
+  const { tabs, closed } = state.session;
+  const index = tabs.indexOf(tab);
+  return [
+    { label: 'New tab to the right', onSelect: () => dispatch({ type: 'tab/open', path: paths.dashboard(), afterId: tab.id }) },
+    { label: 'Duplicate', onSelect: () => dispatch({ type: 'tab/duplicate', id: tab.id }) },
+    { label: tab.pinned ? 'Unpin' : 'Pin', onSelect: () => dispatch({ type: 'tab/pin', id: tab.id, pinned: !tab.pinned }) },
     null,
-    { label: 'Close', shortcut: 'Ctrl+W', action: { type: 'tab/close', id: tab.id } },
-    { label: 'Close other tabs', action: { type: 'tab/closeOthers', id: tab.id }, disabled: state.session.tabs.length < 2 },
-    { label: 'Close tabs to the right', action: { type: 'tab/closeRight', id: tab.id }, disabled: index === state.session.tabs.length - 1 },
+    { label: 'Close', shortcut: 'Ctrl+W', onSelect: () => dispatch({ type: 'tab/close', id: tab.id }) },
+    { label: 'Close other tabs', disabled: tabs.length < 2, onSelect: () => dispatch({ type: 'tab/closeOthers', id: tab.id }) },
+    { label: 'Close tabs to the right', disabled: index === tabs.length - 1, onSelect: () => dispatch({ type: 'tab/closeRight', id: tab.id }) },
     null,
-    { label: 'Reopen closed tab', shortcut: 'Ctrl+Shift+T', action: { type: 'tab/reopen' }, disabled: !state.session.closed?.length },
+    { label: 'Reopen closed tab', shortcut: 'Ctrl+Shift+T', disabled: !closed?.length, onSelect: () => dispatch({ type: 'tab/reopen' }) },
   ];
-  return (
-    <div className="context-menu" role="menu" ref={ref} style={{ left: Math.min(menu.x, window.innerWidth - 240), top: menu.y }}>
-      {items.map((item, i) =>
-        item ? (
-          <button
-            key={item.label}
-            role="menuitem"
-            disabled={item.disabled}
-            onClick={() => {
-              dispatch(item.action);
-              onClose();
-            }}
-          >
-            <span>{item.label}</span>
-            {item.shortcut && <kbd>{item.shortcut}</kbd>}
-          </button>
-        ) : (
-          <hr key={`sep-${i}`} />
-        ),
-      )}
-    </div>
-  );
 }
