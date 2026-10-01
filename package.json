@@ -1,0 +1,27 @@
+{
+  "name": "planning-app",
+  "version": "1.0.0",
+  "productName": "Planner",
+  "description": "A desktop planning app with browser-style tabs, categories, daily and hourly plans.",
+  "main": "electron/main.cjs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "start": "vite build && electron .",
+    "dev": "node scripts/dev.mjs",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:e2e": "vite build && playwright test"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.5.1",
+    "vite": "^8.3.2"
+  }
+}
