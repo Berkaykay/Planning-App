@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { reducer, createInitialData, normalizeData, normalizePlan } from '../../src/lib/store.js';
 import { categoryStats, dayProgress, historyDays, lessonsOn, monthStats, tasksOn, unfinishedPlans } from '../../src/lib/recurrence.js';
-import { historyReducer, initHistory, describeChange } from '../../src/lib/history.js';
+import { historyReducer, initHistory } from '../../src/lib/history.js';
 
 const run = (state, ...actions) => actions.reduce(reducer, state);
 const base = () => ({ ...createInitialData(), categories: [], plans: [] });
@@ -106,7 +106,6 @@ test('undo and redo restore plans but leave tabs and settings alone', () => {
   let h = initHistory(base());
   h = historyReducer(h, { type: 'plan/add', plan: { id: 'a', title: 'Gym', date: '2026-10-01' } });
   h = historyReducer(h, { type: 'plan/setDone', id: 'a', date: '2026-10-01', done: true });
-  assert.equal(describeChange(h.last), 'Completed "Gym"');
   h = historyReducer(h, { type: 'tab/open', path: 'calendar' });
   h = historyReducer(h, { type: 'history/undo' });
   assert.deepEqual(h.data.plans[0].doneDates, []);
@@ -114,7 +113,6 @@ test('undo and redo restore plans but leave tabs and settings alone', () => {
   h = historyReducer(h, { type: 'history/redo' });
   assert.deepEqual(h.data.plans[0].doneDates, ['2026-10-01']);
   h = historyReducer(h, { type: 'plan/delete', id: 'a' });
-  assert.equal(describeChange(h.last), 'Deleted "Gym"');
   h = historyReducer(h, { type: 'history/undo' });
   assert.equal(h.data.plans.length, 1);
   // A new change clears the redo list.

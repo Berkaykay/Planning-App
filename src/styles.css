@@ -286,8 +286,15 @@ a.link {
   background: var(--chrome);
   padding: 6px 8px 0;
   overflow-x: auto;
+  /* Only ever scroll sideways, and without a visible scrollbar. */
+  overflow-y: hidden;
+  scrollbar-width: none;
   flex-shrink: 0;
   user-select: none;
+}
+
+.tabbar::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
@@ -326,7 +333,7 @@ a.link {
 @keyframes tab-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: scaleX(0.85);
   }
 }
 
@@ -1003,7 +1010,6 @@ a.link {
 .day-planner {
   display: flex;
   flex-direction: column;
-  height: 100%;
 }
 
 .day-planner .page-header {
@@ -1011,9 +1017,6 @@ a.link {
 }
 
 .day-planner .all-day {
-  max-height: 40%;
-  overflow: auto;
-  flex-shrink: 0;
   margin-bottom: 16px;
 }
 
@@ -1048,9 +1051,6 @@ a.link {
 
 .hour-grid {
   position: relative;
-  flex: 1;
-  min-height: 220px;
-  overflow: auto;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1148,7 +1148,8 @@ a.link {
 
 .calendar-top {
   display: grid;
-  grid-template-columns: minmax(0, 720px) minmax(300px, 1fr);
+  /* About 70 / 30 between the calendar and the day panel at any window width. */
+  grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
   gap: 20px;
   flex: 1;
   min-height: 0;
@@ -2385,38 +2386,339 @@ a.link {
   font-size: 13px;
 }
 
-/* ---------- Toast ---------- */
+/* ---------- Drag and drop ---------- */
 
-.toast {
+body.dragging-plan,
+body.dragging-plan * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.drag-ghost {
   position: fixed;
-  left: 50%;
-  bottom: 22px;
-  transform: translateX(-50%);
-  z-index: 150;
+  z-index: 300;
+  pointer-events: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  font-weight: 600;
+  font-size: 13px;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan {
+  touch-action: none;
+}
+
+/* ---------- Context menus ---------- */
+
+.menu-item-wrap {
+  position: relative;
+}
+
+.context-menu button {
+  width: 100%;
+}
+
+.context-menu button.danger {
+  color: var(--danger);
+}
+
+.context-menu button.open,
+.context-menu button:focus-visible {
+  background: var(--surface-2);
+}
+
+.menu-check {
+  display: inline-block;
+  width: 16px;
+  color: var(--success);
+}
+
+/* ---------- Checklists ---------- */
+
+.checklist-badge {
+  border: none;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.checklist-badge.complete {
+  color: var(--success);
+}
+
+.checklist {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: default;
+}
+
+.checklist label {
   display: flex;
   align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.checklist input {
+  accent-color: var(--success);
+}
+
+.checklist li.done span {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.checklist-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checklist-editor li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.checklist-editor ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checklist-editor li span {
+  flex: 1;
+}
+
+/* ---------- Lessons: absent ---------- */
+
+.lesson.absent {
+  background: var(--danger-soft);
+}
+
+.lesson-absent {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* ---------- Week view ---------- */
+
+.week-page {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  padding: 9px 10px 9px 16px;
-  border-radius: 10px;
-  background: var(--text);
-  color: var(--bg);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
-  animation: toast-in 0.18s ease-out;
-  font-size: 13.5px;
 }
 
-.toast .link-button {
-  color: var(--accent-soft);
+.week-title {
+  min-width: 200px;
+  text-align: center;
 }
 
-.toast .icon-button {
-  color: var(--bg);
-  opacity: 0.7;
+.week-grid {
+  display: grid;
+  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 10px);
-  }
+.week-corner,
+.week-gutter-label {
+  border-bottom: 1px solid var(--line);
+}
+
+.week-gutter-label {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 8px 6px;
+  text-align: right;
+}
+
+.week-day-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.week-day-head .check {
+  margin-left: auto;
+}
+
+.week-day-head.day-done {
+  background: color-mix(in srgb, var(--success-soft) 55%, var(--surface));
+}
+
+.week-day-link {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.week-weekday {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.week-date {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.week-day-head.today .week-date {
+  color: var(--accent-text);
+}
+
+.week-allday {
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 4px;
+  min-height: 38px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.week-hours {
+  display: flex;
+  flex-direction: column;
+}
+
+.week-hour-label {
+  height: var(--hour);
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+  padding: 2px 6px 0 0;
+  font-variant-numeric: tabular-nums;
+  border-top: 1px solid var(--line);
+}
+
+.week-column {
+  position: relative;
+  border-left: 1px solid var(--line);
+}
+
+.week-column.today {
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+}
+
+.week-slot {
+  height: var(--hour);
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.week-slot:hover {
+  background: var(--surface-2);
+}
+
+.week-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--danger);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.week-block-wrap {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+}
+
+.week-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.lesson-block {
+  position: absolute;
+  z-index: 1;
+  flex-direction: column;
+  gap: 0;
+  padding: 2px 6px;
+  border: none;
+  border-left: 3px solid var(--cat);
+  background: color-mix(in srgb, var(--cat) 16%, var(--surface));
+  color: var(--text);
+  white-space: normal;
+}
+
+.lesson-block:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--cat) 26%, var(--surface));
+}
+
+.lesson-block.done .block-title {
+  color: var(--muted);
+}
+
+.plan-block {
+  width: 100%;
+  padding: 3px 5px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--cat);
+  cursor: grab;
+  touch-action: none;
+}
+
+.plan-block.done .block-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.block-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.block-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.block-time {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }

@@ -101,6 +101,22 @@ function createWindow() {
     return { action: 'deny' };
   });
 
+  // Electron shows no right-click menu in text fields by default; offer the usual edit actions.
+  // (The app's own right-click menus prevent this event, so it only fires for text fields.)
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    if (!params.isEditable) return;
+    Menu.buildFromTemplate([
+      { role: 'undo' },
+      { role: 'redo' },
+      { type: 'separator' },
+      { role: 'cut', enabled: params.editFlags.canCut },
+      { role: 'copy', enabled: params.editFlags.canCopy },
+      { role: 'paste', enabled: params.editFlags.canPaste },
+      { type: 'separator' },
+      { role: 'selectAll' },
+    ]).popup({ window: mainWindow });
+  });
+
   const devServer = process.env.VITE_DEV_SERVER_URL;
   if (devServer) mainWindow.loadURL(devServer);
   else mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));

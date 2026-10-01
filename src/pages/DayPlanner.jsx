@@ -4,7 +4,8 @@ import { tasksOn, isDone } from '../lib/recurrence.js';
 import { addDays, formatHour, formatLong, isDateKey, relativeDayLabel } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import { newId } from '../lib/store.js';
-import PlanItem, { PLAN_DRAG_TYPE } from '../components/PlanItem.jsx';
+import PlanItem from '../components/PlanItem.jsx';
+import { dropAttr } from '../components/dragDrop.jsx';
 import Check from '../components/Check.jsx';
 import Link from '../components/Link.jsx';
 import LessonStrip from '../components/LessonStrip.jsx';
@@ -13,7 +14,7 @@ import { usePlanActions } from '../components/planActions.jsx';
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
 export default function DayPlanner({ date }) {
-  const { state, dispatch, navigate, today } = useApp();
+  const { state, dispatch, navigate, today, menu } = useApp();
   const actions = usePlanActions();
   const gridRef = useRef(null);
   // Lessons are listed separately (LessonStrip) and don't count as plans.
@@ -28,15 +29,23 @@ export default function DayPlanner({ date }) {
   useEffect(() => {
     const hours = plans.filter((p) => p.hour !== null && (date !== today || !isDone(p, date))).map((p) => p.hour);
     const first = Math.min(date === today ? Math.max(0, nowHour - 1) : 8, ...hours);
-    const grid = gridRef.current;
-    const row = grid?.querySelector(`[data-hour="${first}"]`);
-    if (row) grid.scrollTop = row.offsetTop;
+    // The whole page scrolls (not just the hours), so scroll the page to that hour.
+    const row = gridRef.current?.querySelector(`[data-hour="${first}"]`);
+    const page = gridRef.current?.closest('.page');
+    // Put that hour about a third of the way down the window, so what comes before stays in view.
+    if (row && page && first > 0) {
+      page.scrollTop = row.getBoundingClientRect().top - page.getBoundingClientRect().top - page.clientHeight / 3;
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dropTo = (hour) => (payload) => {
-    const plan = state.plans.find((p) => p.id === payload.id);
-    if (plan) actions.move(plan, payload.date, { date, hour });
-  };
+  const hourMenu = (e, hour) =>
+    menu.open(e, [
+      { label: `Add plan at ${formatHour(hour)}`, onSelect: () => actions.create({ date, hour }) },
+      { label: 'Add all-day plan', onSelect: () => actions.create({ date }) },
+      null,
+      { label: dayDone ? 'Mark day as not complete' : 'Mark day complete', onSelect: () => dispatch({ type: 'day/setDone', date, done: !dayDone }) },
+      { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: () => dispatch({ type: 'history/undo' }) },
+    ]);
 
   return (
     <div className={`day-planner ${dayDone ? 'day-done' : ''}`}>
@@ -81,7 +90,7 @@ export default function DayPlanner({ date }) {
       <LessonStrip date={date} />
 
       <section className="all-day">
-        <DropZone onDropPlan={dropTo(null)} className="all-day-zone" testId="all-day-zone">
+        <DropZone target={{ kind: 'slot', date, hour: null }} className="all-day-zone" testId="all-day-zone">
           <div className="section-label">All day</div>
           <div className="plan-list">
             {allDay.map((p) => (
@@ -101,7 +110,8 @@ export default function DayPlanner({ date }) {
           return (
             <DropZone
               key={hour}
-              onDropPlan={dropTo(hour)}
+              target={{ kind: 'slot', date, hour }}
+              onContextMenu={(e) => hourMenu(e, hour)}
               className={`hour-row ${date === today && hour === nowHour ? 'now' : ''}`}
               testId={`hour-${hour}`}
               dataHour={hour}
@@ -127,28 +137,10 @@ export default function DayPlanner({ date }) {
   );
 }
 
-function DropZone({ onDropPlan, className, children, testId, dataHour }) {
-  const [over, setOver] = useState(false);
+// A place a dragged plan can be dropped (see components/dragDrop.jsx).
+function DropZone({ target, className, children, testId, dataHour, onContextMenu }) {
   return (
-    <div
-      className={`${className} ${over ? 'drop-target' : ''}`}
-      data-testid={testId}
-      data-hour={dataHour}
-      onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes(PLAN_DRAG_TYPE)) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        setOver(true);
-      }}
-      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setOver(false)}
-      onDrop={(e) => {
-        setOver(false);
-        const data = e.dataTransfer.getData(PLAN_DRAG_TYPE);
-        if (!data) return;
-        e.preventDefault();
-        onDropPlan(JSON.parse(data));
-      }}
-    >
+    <div className={className} data-testid={testId} data-hour={dataHour} data-drop={dropAttr(target)} onContextMenu={onContextMenu}>
       {children}
     </div>
   );

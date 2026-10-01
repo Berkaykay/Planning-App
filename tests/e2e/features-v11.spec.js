@@ -125,10 +125,10 @@ test('calendar: selecting a day shows its plans beside the calendar, with month 
   await expect(panel.getByTestId('plan')).toContainText('Laundry');
   await expect(page.getByTestId(`cell-${today}`)).toHaveAttribute('aria-selected', 'true');
 
-  // Complete the plan and the day from the panel.
+  // Completing the day's only plan from the panel completes the day too.
   await panel.getByRole('checkbox', { name: 'Mark "Laundry" complete' }).click();
   await expect(page.getByTestId(`cell-${today}`).locator('.cell-count')).toHaveText('1/1');
-  await panel.getByRole('checkbox', { name: `Mark ${today} complete` }).click();
+  await expect(panel.getByRole('checkbox', { name: `Mark ${today} complete` })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByTestId(`cell-${today}`)).toHaveClass(/day-done/);
   const stats = page.getByTestId('month-stats');
   await expect(stats).toContainText('Days completed1');

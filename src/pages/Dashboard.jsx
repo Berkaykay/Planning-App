@@ -133,6 +133,7 @@ function CategoryTile({ category, todays }) {
   const { state, today } = useApp();
   const stats = categoryStats(state.plans, category.id, today);
   const todayCount = todays.filter((p) => p.categoryId === category.id).length;
+  const lessonCount = lessonsOn(state.plans, today).filter((p) => p.categoryId === category.id).length;
   const week = stats.thisWeek;
   return (
     <Link to={paths.category(category.id)} className="category-tile" style={{ '--cat': category.color }} title={category.description || category.name}>
@@ -142,7 +143,8 @@ function CategoryTile({ category, todays }) {
       <span className="tile-body">
         <span className="tile-name">{category.name}</span>
         <span className="subtle">
-          {todayCount ? `${todayCount} today` : 'Nothing today'}
+          {todayCount ? `${todayCount} today` : lessonCount ? '' : 'Nothing today'}
+          {lessonCount > 0 && `${todayCount ? ' · ' : ''}${lessonCount} lesson${lessonCount === 1 ? '' : 's'} today`}
           {week.total > 0 && ` · ${week.done}/${week.total} this week`}
         </span>
         <span className="tile-bar">

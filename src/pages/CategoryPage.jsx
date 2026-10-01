@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context.js';
-import { categoryStats, comparePlans, isDone, isLesson } from '../lib/recurrence.js';
+import { categoryAll, categoryStats, comparePlans, isDone, isLesson } from '../lib/recurrence.js';
 import { formatShort, formatTimeRange, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import PlanItem from '../components/PlanItem.jsx';
@@ -20,7 +20,7 @@ export default function CategoryPage({ id }) {
   const categoryActions = useCategoryActions();
   const [renaming, setRenaming] = useState(false);
   const [customizing, setCustomizing] = useState(false);
-  const [tab, setTab] = useState('upcoming');
+  const [tab, setTab] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('date');
 
@@ -47,7 +47,12 @@ export default function CategoryPage({ id }) {
     missed: oneOff.filter((p) => p.date < today && !isDone(p, p.date)),
     repeating: tasks.filter((p) => p.repeat),
   };
+  // "All": every plan in one list, done or not, each on its date (repeating ones on their next date).
+  const allEntries = categoryAll(state.plans, id, today);
+  lists.all = allEntries.map((e) => e.plan);
+  const dateOf = new Map(allEntries.map((e) => [e.plan.id, e.date]));
   const tabs = [
+    { id: 'all', label: 'All' },
     { id: 'upcoming', label: 'Upcoming' },
     { id: 'done', label: 'Done' },
     { id: 'missed', label: 'Missed' },
@@ -57,7 +62,7 @@ export default function CategoryPage({ id }) {
   const q = query.trim().toLowerCase();
   const matches = (p) => !q || p.title.toLowerCase().includes(q) || p.notes.toLowerCase().includes(q);
   let list = (lists[tab] ?? []).filter(matches);
-  list = [...list].sort(sort === 'name' ? byName : byDate);
+  if (tab !== 'all' || sort === 'name') list = [...list].sort(sort === 'name' ? byName : byDate);
   if (tab === 'done' && sort === 'date') list.reverse();
   const stats = categoryStats(state.plans, id, today);
   const maxWeek = Math.max(1, ...stats.weeks.map((w) => w.total));
@@ -186,13 +191,13 @@ export default function CategoryPage({ id }) {
         ) : (
           <div className="plan-list">
             {list.map((p) => (
-              <PlanItem key={p.id} plan={p} date={p.date} showDate />
+              <PlanItem key={p.id} plan={p} date={dateOf.get(p.id) ?? p.date} showDate />
             ))}
           </div>
         )}
         {tab !== 'lessons' && list.length === 0 && (
           <p className="empty">
-            {q ? 'No plans match your search.' : { upcoming: 'Nothing coming up.', done: 'Nothing completed yet.', missed: 'Nothing missed. Nice!', repeating: 'No repeating plans.' }[tab]}
+            {q ? 'No plans match your search.' : { all: 'No plans in this category yet.', upcoming: 'Nothing coming up.', done: 'Nothing completed yet.', missed: 'Nothing missed. Nice!', repeating: 'No repeating plans.' }[tab]}
           </p>
         )}
       </section>

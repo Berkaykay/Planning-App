@@ -153,8 +153,8 @@ test('whole days can be marked complete and undone', async () => {
   await expect(dayCheck).toHaveAttribute('aria-checked', 'true');
   await expectCrossedOut(page.getByTestId('day-heading'), true);
   await expect(page.getByText('Day complete')).toBeVisible();
-  // Day completion is independent of the plans in it.
-  await expect(check('Groceries')).toHaveAttribute('aria-checked', 'false');
+  // Completing the day completes its plans too.
+  await expect(check('Groceries')).toHaveAttribute('aria-checked', 'true');
 
   // The calendar and dashboard show the completed day too.
   await sidebar().getByRole('link', { name: 'Calendar' }).click();
@@ -167,6 +167,13 @@ test('whole days can be marked complete and undone', async () => {
   await openToday();
   await expect(dayCheck).toHaveAttribute('aria-checked', 'false');
   await expectCrossedOut(page.getByTestId('day-heading'), false);
+  await expect(check('Groceries')).toHaveAttribute('aria-checked', 'false');
+
+  // Checking every plan completes the day; unchecking one reopens it.
+  await check('Groceries').click();
+  await expect(dayCheck).toHaveAttribute('aria-checked', 'true');
+  await check('Groceries').click();
+  await expect(dayCheck).toHaveAttribute('aria-checked', 'false');
 });
 
 test('repeating plans get a fresh check mark each day and keep history', async () => {
@@ -278,8 +285,9 @@ test('everything persists after closing and reopening the app', async () => {
   await dialog().getByLabel('Title').fill('Water the plants');
   await dialog().getByLabel('Category').selectOption({ label: 'Garden' });
   await dialog().getByRole('button', { name: 'Add plan' }).click();
+  // Checking the day's only plan also completes the day.
   await check('Water the plants').click();
-  await page.getByRole('checkbox', { name: 'Mark whole day complete' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Mark whole day complete' })).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('button', { name: 'New tab' }).click();
   await sidebar().getByRole('link', { name: 'Calendar' }).click();
 

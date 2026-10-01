@@ -123,3 +123,31 @@ function ChoiceDialog({ title, message, choices, close }) {
     </Modal>
   );
 }
+
+// Asks for a date. Resolves with "YYYY-MM-DD", or null when cancelled.
+export function DatePromptDialog({ title, label, initial, confirmLabel = 'OK', onClose }) {
+  const [value, setValue] = useState(initial);
+  return (
+    <Modal
+      title={title}
+      className="modal-small"
+      onClose={() => onClose(null)}
+      onSubmit={() => value && onClose(value)}
+      footer={
+        <>
+          <button type="button" onClick={() => onClose(null)}>
+            Cancel
+          </button>
+          <button type="submit" className="primary">
+            {confirmLabel}
+          </button>
+        </>
+      }
+    >
+      <label className="field">
+        <span>{label}</span>
+        <input type="date" data-autofocus aria-label={label} value={value} onChange={(e) => setValue(e.target.value)} />
+      </label>
+    </Modal>
+  );
+}
