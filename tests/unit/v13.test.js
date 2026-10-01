@@ -100,7 +100,7 @@ test('weekLayout places blocks by time with lanes for overlaps', () => {
     normalizePlan({ id: 'd', title: 'd', date: '2026-10-07' }),
     normalizePlan({ id: 'e', title: 'e', date: '2026-10-11', hour: 23, duration: 30 }),
   ];
-  const { days, fromHour, toHour } = weekLayout(plans, D);
+  const { days, fromHour, toHour, firstHour } = weekLayout(plans, D);
   assert.equal(days.length, 7);
   assert.deepEqual(days[0].blocks.map((b) => [b.plan.id, b.start, b.lane, b.lanes]), [
     ['a', 540, 0, 2],
@@ -108,7 +108,10 @@ test('weekLayout places blocks by time with lanes for overlaps', () => {
     ['c', 660, 0, 1],
   ]);
   assert.equal(days[2].allDay[0].id, 'd');
-  assert.deepEqual([fromHour, toHour], [7, 24]);
+  // Always the whole day; opens at 07:00 unless something starts earlier.
+  assert.deepEqual([fromHour, toHour, firstHour], [0, 24, 7]);
+  plans.push(normalizePlan({ id: 'f', title: 'f', date: D, hour: 5 }));
+  assert.equal(weekLayout(plans, D).firstHour, 5);
 });
 
 test('categoryAll lists every plan of a category in date order', () => {

@@ -128,7 +128,7 @@ test('deadlines: add from the calendar, see them everywhere until done, edit any
   await sidebar().getByRole('link', { name: 'Dashboard' }).click();
   const card = page.getByTestId('deadlines');
   await expect(card).toContainText('Physics report');
-  await expect(card).toContainText('Due in 3 days');
+  await expect(card.getByTestId('days-left')).toHaveText('3 days left');
 
   // It shows on every day until it's due, but not after.
   await sidebar().getByRole('link', { name: 'Day Planner' }).click();
@@ -145,17 +145,34 @@ test('deadlines: add from the calendar, see them everywhere until done, edit any
   await card.getByRole('button', { name: 'Edit deadline "Physics report"' }).click();
   await dialog().getByLabel('Due date').fill(addDays(today, 1));
   await dialog().getByRole('button', { name: 'Save' }).click();
-  await expect(card).toContainText('Due tomorrow');
+  await expect(card.getByTestId('days-left')).toHaveText('Tomorrow');
 
-  // Done: it leaves the Dashboard and the calendar flag goes away.
-  await card.getByRole('checkbox', { name: 'Mark deadline "Physics report" done' }).click();
-  await expect(card.getByTestId('deadline')).toHaveCount(0);
+  // Done: it stays on the Dashboard, crossed out, so a misclick is one click to undo.
+  const doneBox = card.getByRole('checkbox', { name: 'Mark deadline "Physics report" done' });
+  await doneBox.click();
   await expect.poll(() => readData(dataDir).deadlines[0].done).toBe(true);
-  await goTo(`planner://calendar/${addDays(today, 1)}`);
-  await expect(page.getByTestId('cell-flag')).toHaveCount(0);
-  // Undo brings it back.
+  await expect(card.getByTestId('deadline')).toHaveClass(/done/);
+  await expect(card.getByTestId('days-left')).toHaveText('Done');
+  await doneBox.click();
+  await expect(card.getByTestId('deadline')).not.toHaveClass(/done/);
+  await doneBox.click();
+
+  // In the calendar the flag turns green and the day panel lists it under "Finished", not as due.
+  const tomorrow = addDays(today, 1);
+  await goTo(`planner://calendar/${tomorrow}`);
+  await expect(page.getByTestId(`cell-${tomorrow}`).getByTestId('cell-flag')).toHaveCount(0);
+  await expect(page.getByTestId(`cell-${tomorrow}`).getByTestId('cell-flag-done')).toBeVisible();
+  await expect(page.getByTestId('day-deadlines')).toHaveCount(0);
+  await expect(page.getByTestId('finished-deadlines')).toContainText('Physics report');
+  // Undo reopens it.
   await page.keyboard.press('Control+z');
-  await expect(page.getByTestId('cell-flag')).toHaveCount(1);
+  await expect(page.getByTestId(`cell-${tomorrow}`).getByTestId('cell-flag')).toBeVisible();
+  await expect(page.getByTestId('day-deadlines')).toContainText('Physics report');
+
+  // On its due day it's listed in the Day Planner's All day section (and not under "Due soon").
+  await goTo(`planner://day/${tomorrow}`);
+  await expect(page.getByTestId('due-here')).toContainText('Physics report');
+  await expect(page.getByTestId('due-soon')).toHaveCount(0);
 });
 
 test('dashboard: this-week strip, up next and progress stats', async () => {
@@ -176,4 +193,47 @@ test('dashboard: this-week strip, up next and progress stats', async () => {
   await expect(page.getByTestId('stats')).toContainText('2 days');
   await strip.locator('.strip-day.today').click();
   await expect(page.getByTestId('day-heading')).toBeVisible();
+});
+
+test('week view always shows all 24 hours, even after moving the only early plan away', async () => {
+  await start(normalizeData({ plans: [P({ id: 'a', title: 'Early run', date: today, hour: 5, minute: 0, duration: 30 })] }));
+  await sidebar().getByRole('link', { name: 'Week' }).click();
+  const hours = page.locator('.week-hour-label');
+  await expect(hours).toHaveCount(24);
+  // It opens scrolled to the earliest plan (05:00), with the day headers still visible.
+  await expect(page.getByTestId(`slot-${today}-5`)).toBeInViewport();
+  await expect(page.locator('.week-day-head').first()).toBeInViewport();
+  const block = page.getByTestId('week-plan').filter({ hasText: 'Early run' });
+  await pointerDrag(page, await center(block), await center(page.getByTestId(`slot-${today}-9`)));
+  await expect.poll(() => readData(dataDir).plans[0].hour).toBe(9);
+  await expect(hours).toHaveCount(24);
+  for (const h of [0, 3, 6]) await expect(page.getByTestId(`slot-${today}-${h}`)).toHaveCount(1);
+  // Reopening the week starts at 07:00 now that nothing is earlier.
+  await goTo('planner://dashboard');
+  await sidebar().getByRole('link', { name: 'Week' }).click();
+  await expect(page.getByTestId(`slot-${today}-7`)).toBeInViewport();
+  await expect(page.getByTestId(`slot-${today}-0`)).not.toBeInViewport();
+});
+
+test('browser-style title bar: app icon in the tab strip, no menu bar on Alt, shortcuts still work', async () => {
+  await start();
+  await expect(page.locator('.titlebar .app-logo')).toBeVisible();
+  await expect(page.getByTestId('titlebar-drag')).toHaveCSS('-webkit-app-region', 'drag');
+  const win = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    return { menuBar: w.isMenuBarVisible(), autoHide: w.isMenuBarAutoHide() };
+  });
+  expect(await win()).toEqual({ menuBar: false, autoHide: false });
+  await page.keyboard.press('Alt');
+  expect((await win()).menuBar).toBe(false);
+  // Keyboard shortcuts from the (hidden) menu keep working.
+  await page.keyboard.press('Control+t');
+  await expect(page.getByTestId('tab')).toHaveCount(2);
+  await page.keyboard.press('Control+w');
+  await expect(page.getByTestId('tab')).toHaveCount(1);
+  // Tabs never slide under the window buttons on the right.
+  const bar = await page.locator('.titlebar').boundingBox();
+  const area = await page.evaluate(() => navigator.windowControlsOverlay?.getTitlebarAreaRect().width);
+  if (area) expect(await page.getByRole('button', { name: 'New tab' }).evaluate((el) => el.getBoundingClientRect().right)).toBeLessThanOrEqual(area);
+  expect(bar.height).toBe(40);
 });

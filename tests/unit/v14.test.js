@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { reducer, createInitialData, normalizeData, DATA_VERSION } from '../../src/lib/store.js';
-import { currentStreak, daysUntil, deadlinesDueOn, dueLabel, openDeadlines, rangeStats, upNext } from '../../src/lib/recurrence.js';
+import { currentStreak, dashboardDeadlines, daysLeftLabel, daysUntil, deadlinesDueOn, dueLabel, openDeadlines, rangeStats, upNext } from '../../src/lib/recurrence.js';
 import { historyReducer, initHistory } from '../../src/lib/history.js';
 import { parseRoute } from '../../src/lib/routes.js';
 
@@ -115,4 +115,21 @@ test('calendar address with a date opens that month with the day selected', () =
   assert.deepEqual(parseRoute('calendar/2026-03-12'), { page: 'calendar', month: '2026-03', date: '2026-03-12' });
   assert.deepEqual(parseRoute('calendar/2026-03'), { page: 'calendar', month: '2026-03' });
   assert.equal(parseRoute('calendar/2026-13-40').page, 'notfound');
+});
+
+test('days-left badge, long and short', () => {
+  assert.equal(daysLeftLabel('2026-10-08', T), '3 days left');
+  assert.equal(daysLeftLabel('2026-10-08', T, true), '3d');
+  assert.equal(daysLeftLabel('2026-10-06', T), 'Tomorrow');
+  assert.equal(daysLeftLabel(T, T), 'Today');
+  assert.equal(daysLeftLabel('2026-10-04', T), '1 day late');
+  assert.equal(daysLeftLabel('2026-10-02', T, true), '3d late');
+});
+
+test('dashboard deadlines: checking one leaves it in place; finished past ones are folded away', () => {
+  const D = (id, due, done = false) => ({ id, due, hour: null, minute: 0, done });
+  const ds = [D('later', '2026-10-09'), D('ticked', '2026-10-07', true), D('late', '2026-10-01'), D('old-done', '2026-10-02', true), D('older-done', '2026-09-20', true), D('today-done', T, true)];
+  const { current, past } = dashboardDeadlines(ds, T);
+  assert.deepEqual(current.map((d) => d.id), ['late', 'today-done', 'ticked', 'later']);
+  assert.deepEqual(past.map((d) => d.id), ['old-done', 'older-done']);
 });

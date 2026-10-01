@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { useApp } from '../context.js';
-import { deadlinesDueOn, isDone, lessonAttended, tasksOn, weekLayout, isLesson } from '../lib/recurrence.js';
-import { FlagIcon } from '../components/Icons.jsx';
-import { useDeadlineActions } from '../components/deadlineActions.jsx';
+import { isDone, lessonAttended, tasksOn, weekLayout, isLesson } from '../lib/recurrence.js';
+import { DayFlag, useDeadlineActions } from '../components/deadlineActions.jsx';
 import { addDays, formatHour, formatShort, formatTimeRange, formatWeekday, fromKey, monthOf, weekStart } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import Link from '../components/Link.jsx';
@@ -20,11 +19,27 @@ export default function Week({ start }) {
   const deadlineActions = useDeadlineActions();
   const startDrag = useDrag();
   const now = useNow();
-  const { days, fromHour, toHour } = weekLayout(state.plans, start);
+  const { days, fromHour, toHour, firstHour } = weekLayout(state.plans, start);
+  const gridRef = useRef(null);
+  const firstHourRef = useRef(firstHour);
+  firstHourRef.current = firstHour;
   const hours = Array.from({ length: toHour - fromHour }, (_, i) => fromHour + i);
   const colors = Object.fromEntries(state.categories.map((c) => [c.id, c.color]));
   const end = addDays(start, 6);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // All 24 hours are always there. When a week opens, scroll once so 07:00 (or the earliest plan)
+  // sits just under the day headers; moving plans around afterwards never scrolls or hides hours.
+  useLayoutEffect(() => {
+    const grid = gridRef.current;
+    const page = grid?.closest('.page');
+    const label = grid?.querySelectorAll('.week-hour-label')[firstHourRef.current];
+    if (!page || !label) return;
+    const head = grid.querySelector('.week-day-head');
+    page.scrollTop += label.getBoundingClientRect().top - page.getBoundingClientRect().top - head.offsetHeight;
+    // Then line the hour up just below the (now stuck) day headers.
+    page.scrollTop += label.getBoundingClientRect().top - head.getBoundingClientRect().bottom - 4;
+  }, [start]);
 
   const dayMenu = (e, date) => {
     const done = Boolean(state.days[date]?.done);
@@ -71,7 +86,7 @@ export default function Week({ start }) {
         </div>
       </header>
 
-      <div className="week-grid" style={{ '--hour': `${HOUR_HEIGHT}px` }} data-testid="week-grid">
+      <div className="week-grid" ref={gridRef} style={{ '--hour': `${HOUR_HEIGHT}px` }} data-testid="week-grid">
         <div className="week-corner" />
         {days.map(({ date }) => {
           const tasks = tasksOn(state.plans, date);
@@ -89,13 +104,7 @@ export default function Week({ start }) {
                 <span className="week-date">{fromKey(date).getDate()}</span>
               </Link>
               <span className="subtle">{tasks.length ? `${done}/${tasks.length}` : ''}</span>
-              {deadlinesDueOn(state.deadlines, date)
-                .filter((d) => !d.done)
-                .map((d) => (
-                  <span key={d.id} className="cell-flag" title={`Deadline: ${d.title}`}>
-                    <FlagIcon size={13} />
-                  </span>
-                ))}
+              <DayFlag date={date} />
               <Check size="small" checked={dayDone} label={`Mark ${date} complete`} onChange={(v) => dispatch({ type: 'day/setDone', date, done: v })} />
             </div>
           );

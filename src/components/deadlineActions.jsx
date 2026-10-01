@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context.js';
 import { newId } from '../lib/store.js';
-import { dueLabel, daysUntil, openDeadlines } from '../lib/recurrence.js';
+import { daysLeftLabel, deadlinesDueOn, dueLabel, daysUntil, openDeadlines } from '../lib/recurrence.js';
 import { formatMedium, formatTime, isDateKey, parseTime } from '../lib/dates.js';
 import { Modal } from './Dialogs.jsx';
 import Check from './Check.jsx';
@@ -157,19 +157,26 @@ export function DeadlineItem({ deadline, compact = false }) {
         <FlagIcon size={compact ? 14 : 16} />
       </span>
       <div className="deadline-main">
-        <span className="deadline-title">{deadline.title}</span>
-        <span className="deadline-due">
-          {deadline.done ? 'Done' : dueLabel(deadline.due, today)}
-          {deadline.hour !== null && ` · ${formatTime(deadline.hour, deadline.minute)}`}
-          {!compact && n > 1 && n <= 14 && ` · ${formatMedium(deadline.due)}`}
-          {category && !compact && (
-            <span className="chip">
-              <span className="dot" style={{ background: category.color }} />
-              {category.name}
-            </span>
-          )}
+        <span className="deadline-title" title={`${deadline.title} · ${dueLabel(deadline.due, today)}`}>
+          {deadline.title}
         </span>
+        {!compact && (
+          <span className="deadline-due">
+            Due {formatMedium(deadline.due)}
+            {deadline.hour !== null && ` · ${formatTime(deadline.hour, deadline.minute)}`}
+            {category && (
+              <span className="chip">
+                <span className="dot" style={{ background: category.color }} />
+                {category.name}
+              </span>
+            )}
+          </span>
+        )}
       </div>
+      <span className="days-left" data-testid="days-left">
+        {deadline.done ? 'Done' : daysLeftLabel(deadline.due, today, compact)}
+        {compact && !deadline.done && deadline.hour !== null && ` · ${formatTime(deadline.hour, deadline.minute)}`}
+      </span>
       {!compact && (
         <div className="plan-actions">
           <button className="icon-button action-icon" aria-label={`Edit deadline "${deadline.title}"`} title="Edit" onClick={() => actions.edit(deadline)}>
@@ -185,9 +192,10 @@ export function DeadlineItem({ deadline, compact = false }) {
 }
 
 // Slim bar at the top of the Day Planner: deadlines still ahead of this day (and overdue ones today).
+// Deadlines due on the day itself are listed in the day's All day section instead.
 export function DueSoonBar({ date }) {
   const { state, today } = useApp();
-  const list = openDeadlines(state.deadlines, date, today);
+  const list = openDeadlines(state.deadlines, date, today).filter((d) => d.due !== date);
   if (!list.length) return null;
   const shown = list.slice(0, 6);
   return (
@@ -202,5 +210,22 @@ export function DueSoonBar({ date }) {
         {list.length > shown.length && <span className="subtle">+{list.length - shown.length} more on the Dashboard</span>}
       </div>
     </section>
+  );
+}
+
+// The small flag on a day in the Calendar, Week view and week strip: red while a deadline due that
+// day is unfinished, green with a check once they're all done. The tooltip lists them with days left.
+export function DayFlag({ date, className = 'cell-flag', size = 13 }) {
+  const { state, today } = useApp();
+  const list = deadlinesDueOn(state.deadlines, date);
+  if (!list.length) return null;
+  const open = list.filter((d) => !d.done).length;
+  const title = list.map((d) => `${d.title} — ${d.done ? 'done' : daysLeftLabel(d.due, today)}`).join('\n');
+  return (
+    <span className={`${className} ${open ? '' : 'done'}`} title={title} data-testid={open ? className : `${className}-done`}>
+      <FlagIcon size={size} />
+      {open > 1 && <span className="flag-count">{open}</span>}
+      {!open && <span className="flag-check">✓</span>}
+    </span>
   );
 }

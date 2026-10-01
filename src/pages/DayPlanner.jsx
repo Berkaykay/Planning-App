@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useApp } from '../context.js';
-import { tasksOn, isDone } from '../lib/recurrence.js';
+import { deadlinesDueOn, tasksOn, isDone } from '../lib/recurrence.js';
 import { addDays, formatLong, formatTime, isDateKey, relativeDayLabel } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import { newId } from '../lib/store.js';
@@ -9,7 +9,7 @@ import { dropAttr } from '../components/dragDrop.jsx';
 import Check from '../components/Check.jsx';
 import Link from '../components/Link.jsx';
 import LessonStrip from '../components/LessonStrip.jsx';
-import { DueSoonBar } from '../components/deadlineActions.jsx';
+import { DeadlineItem, DueSoonBar } from '../components/deadlineActions.jsx';
 import { usePlanActions } from '../components/planActions.jsx';
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -23,6 +23,8 @@ export default function DayPlanner({ date }) {
   const allDay = plans.filter((p) => p.hour === null);
   const doneCount = plans.filter((p) => isDone(p, date)).length;
   const dayDone = Boolean(state.days[date]?.done);
+  // Deadlines due on this day are listed with the day's all-day plans (and not in "Due soon").
+  const dueHere = deadlinesDueOn(state.deadlines, date);
   const nowHour = new Date().getHours();
 
   // The page opens at the top; "Now" scrolls the current hour to about a third of the way down.
@@ -102,6 +104,13 @@ export default function DayPlanner({ date }) {
       <section className="all-day">
         <DropZone target={{ kind: 'slot', date, hour: null }} className="all-day-zone" testId="all-day-zone">
           <div className="section-label">All day</div>
+          {dueHere.length > 0 && (
+            <div className="plan-list due-here" data-testid="due-here" aria-label="Deadlines due this day">
+              {dueHere.map((d) => (
+                <DeadlineItem key={d.id} deadline={d} />
+              ))}
+            </div>
+          )}
           <div className="plan-list">
             {allDay.map((p) => (
               <PlanItem key={p.id} plan={p} date={date} showTime={false} />

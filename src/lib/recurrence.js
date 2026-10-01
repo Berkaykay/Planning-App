@@ -210,9 +210,10 @@ const endOf = (p) => startOf(p) + (p.duration ?? 30);
 
 // Layout for the week view: per day, all-day items and timed blocks (with side-by-side lanes
 // for overlapping blocks), plus the hour range to show (07-22 unless plans fall outside).
+// The whole day is always shown (so hours never come and go while you move plans around);
+// `firstHour` is where the view should start scrolled to: 07:00, or the earliest timed plan.
 export function weekLayout(plans, start) {
-  let fromHour = 7;
-  let toHour = 22;
+  let firstHour = 7;
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(start, i);
     const list = plansOn(plans, date);
@@ -220,8 +221,7 @@ export function weekLayout(plans, start) {
     const blocks = [];
     const laneEnds = [];
     for (const p of timed) {
-      fromHour = Math.min(fromHour, p.hour);
-      toHour = Math.max(toHour, Math.ceil(endOf(p) / 60));
+      firstHour = Math.min(firstHour, p.hour);
       let lane = laneEnds.findIndex((end) => end <= startOf(p));
       if (lane === -1) lane = laneEnds.length;
       laneEnds[lane] = endOf(p);
@@ -234,7 +234,7 @@ export function weekLayout(plans, start) {
     }
     return { date, allDay: list.filter((p) => p.hour === null), blocks };
   });
-  return { days, fromHour, toHour: Math.min(24, toHour) };
+  return { days, fromHour: 0, toHour: 24, firstHour };
 }
 
 // ---- Deadlines ---------------------------------------------------------------
@@ -252,6 +252,16 @@ export function dueLabel(due, today) {
   return `Due ${formatMedium(due)}`;
 }
 
+// The countdown badge on a deadline: "3 days left", "Tomorrow", "Today", "2 days late".
+// The short form ("3d", "2d late") is for compact rows.
+export function daysLeftLabel(due, today, short = false) {
+  const n = daysUntil(due, today);
+  if (n === 0) return 'Today';
+  if (n === 1) return short ? '1d' : 'Tomorrow';
+  if (n < 0) return short ? `${-n}d late` : `${-n} day${n === -1 ? '' : 's'} late`;
+  return short ? `${n}d` : `${n} days left`;
+}
+
 const byDue = (a, b) => (a.due === b.due ? (a.hour ?? 24) * 60 + a.minute - ((b.hour ?? 24) * 60 + b.minute) : a.due < b.due ? -1 : 1);
 
 export const deadlinesDueOn = (deadlines, date) => deadlines.filter((d) => d.due === date).sort(byDue);
@@ -260,6 +270,15 @@ export const deadlinesDueOn = (deadlines, date) => deadlines.filter((d) => d.due
 // `date` is today. Soonest first.
 export function openDeadlines(deadlines, date, today) {
   return deadlines.filter((d) => !d.done && (d.due >= date || (date === today && d.due < today))).sort(byDue);
+}
+
+// The Dashboard's deadlines: unfinished ones (overdue included) together with finished ones that
+// aren't due yet, all in due order, so checking one off leaves it in place (crossed out) instead of
+// making it vanish. Finished deadlines whose day has passed are returned separately (newest first).
+export function dashboardDeadlines(deadlines, today) {
+  const current = deadlines.filter((d) => !d.done || d.due >= today).sort(byDue);
+  const past = deadlines.filter((d) => d.done && d.due < today).sort((a, b) => -byDue(a, b));
+  return { current, past };
 }
 
 // ---- Dashboard stats -----------------------------------------------------------

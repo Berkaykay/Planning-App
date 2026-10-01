@@ -1,9 +1,32 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import appIcon from '../../build/icon.png';
 import { useApp } from '../context.js';
 import { currentPath } from '../lib/store.js';
 import { parseRoute, routeTitle, routeIcon, paths } from '../lib/routes.js';
 
 const DRAG_THRESHOLD = 5;
+
+// Keeps the window's minimize / maximize / close buttons (drawn by Electron over the right end of
+// the tab strip) in the strip's colors, for the light, dark and system themes.
+function useWindowButtonColors(theme) {
+  useEffect(() => {
+    if (!window.planner?.setTitleBarColors) return undefined;
+    const update = () => {
+      const css = getComputedStyle(document.documentElement);
+      const color = css.getPropertyValue('--chrome').trim();
+      const symbolColor = css.getPropertyValue('--text').trim();
+      if (color && symbolColor) window.planner.setTitleBarColors({ color, symbolColor });
+    };
+    // Wait a frame: the new theme is applied by an effect higher up, which runs after this one.
+    const frame = requestAnimationFrame(update);
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    media.addEventListener('change', update);
+    return () => {
+      cancelAnimationFrame(frame);
+      media.removeEventListener('change', update);
+    };
+  }, [theme]);
+}
 
 // Browser-style tab strip. Tabs are dragged along the strip (never out of it): the other tabs
 // slide aside, and when released every tab glides to its new place.
@@ -14,6 +37,7 @@ export default function TabBar() {
   const tabRefs = useRef(new Map());
   const lastRects = useRef(new Map());
   const [drag, setDrag] = useState(null);
+  useWindowButtonColors(state.settings.theme);
 
   // FLIP animation: whenever tabs move (reorder, open, close), slide them from where they were
   // last seen to their new place. While dragging, React positions the tabs instead.
@@ -109,52 +133,63 @@ export default function TabBar() {
     return 0;
   };
 
+  // The strip is also the window's title bar: app icon, tabs, "+", then empty space you can drag
+  // the window by (double-click it to maximize), and room for the window buttons.
   return (
-    <div className="tabbar" role="tablist" ref={stripRef} onDoubleClick={(e) => e.target === e.currentTarget && dispatch({ type: 'tab/open', path: paths.dashboard() })}>
-      {tabs.map((tab) => {
-        const route = parseRoute(currentPath(tab));
-        const title = routeTitle(route, state.categories);
-        const active = tab.id === activeTabId;
-        const shift = shiftFor(tab);
-        const dragging = drag?.active && drag.id === tab.id;
-        return (
-          <div
-            key={tab.id}
-            ref={(el) => (el ? tabRefs.current.set(tab.id, el) : tabRefs.current.delete(tab.id))}
-            role="tab"
-            aria-selected={active}
-            className={`tab ${active ? 'active' : ''} ${tab.pinned ? 'pinned' : ''} ${dragging ? 'dragging' : ''}`}
-            style={shift ? { transform: `translateX(${shift}px)` } : undefined}
-            title={title}
-            data-testid="tab"
-            onPointerDown={(e) => startDrag(e, tab)}
-            onPointerMove={moveDrag}
-            onPointerUp={endDrag}
-            onPointerCancel={() => setDrag(null)}
-            onAuxClick={(e) => e.button === 1 && dispatch({ type: 'tab/close', id: tab.id })}
-            onContextMenu={(e) => menu.open(e, tabMenuItems(tab, state, dispatch))}
-          >
-            <span className="tab-icon" aria-hidden>
-              {routeIcon(route)}
-            </span>
-            {!tab.pinned && <span className="tab-title">{title}</span>}
-            {!tab.pinned && (
-              <button
-                className="tab-close"
-                aria-label={`Close tab ${title}`}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => dispatch({ type: 'tab/close', id: tab.id })}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        );
-      })}
-      <button className="new-tab" aria-label="New tab" title="New tab (Ctrl+T)" onClick={() => dispatch({ type: 'tab/open', path: paths.dashboard() })}>
-        +
-      </button>
-    </div>
+    <header className={`titlebar platform-${window.planner?.platform ?? 'web'}`}>
+      <img className="app-logo" src={appIcon} alt="Planner" draggable={false} />
+      <div
+        className="tabbar"
+        role="tablist"
+        ref={stripRef}
+        onDoubleClick={(e) => e.target === e.currentTarget && dispatch({ type: 'tab/open', path: paths.dashboard() })}
+      >
+        {tabs.map((tab) => {
+          const route = parseRoute(currentPath(tab));
+          const title = routeTitle(route, state.categories);
+          const active = tab.id === activeTabId;
+          const shift = shiftFor(tab);
+          const dragging = drag?.active && drag.id === tab.id;
+          return (
+            <div
+              key={tab.id}
+              ref={(el) => (el ? tabRefs.current.set(tab.id, el) : tabRefs.current.delete(tab.id))}
+              role="tab"
+              aria-selected={active}
+              className={`tab ${active ? 'active' : ''} ${tab.pinned ? 'pinned' : ''} ${dragging ? 'dragging' : ''}`}
+              style={shift ? { transform: `translateX(${shift}px)` } : undefined}
+              title={title}
+              data-testid="tab"
+              onPointerDown={(e) => startDrag(e, tab)}
+              onPointerMove={moveDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={() => setDrag(null)}
+              onAuxClick={(e) => e.button === 1 && dispatch({ type: 'tab/close', id: tab.id })}
+              onContextMenu={(e) => menu.open(e, tabMenuItems(tab, state, dispatch))}
+            >
+              <span className="tab-icon" aria-hidden>
+                {routeIcon(route)}
+              </span>
+              {!tab.pinned && <span className="tab-title">{title}</span>}
+              {!tab.pinned && (
+                <button
+                  className="tab-close"
+                  aria-label={`Close tab ${title}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => dispatch({ type: 'tab/close', id: tab.id })}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          );
+        })}
+        <button className="new-tab" aria-label="New tab" title="New tab (Ctrl+T)" onClick={() => dispatch({ type: 'tab/open', path: paths.dashboard() })}>
+          +
+        </button>
+      </div>
+      <div className="titlebar-drag" data-testid="titlebar-drag" />
+    </header>
   );
 }
 
