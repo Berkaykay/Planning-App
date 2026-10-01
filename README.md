@@ -47,15 +47,15 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 - Drag a tab along the tab strip to reorder it; the other tabs slide out of the way.
 - Right-click a tab for more options: *New tab to the right*, *Duplicate*, *Pin* (pinned tabs shrink to an icon and stay on the left), *Close other tabs*, *Close tabs to the right* and *Reopen closed tab*.
 - Each tab has its own back/forward history. Use the ← → buttons, **Alt+←/→** (on macOS **Cmd+[ / ]**), or the mouse side buttons.
-- The address bar shows the page you're on, such as `planner://day/2026-10-01`, and you can type an address to go there. Addresses: `planner://dashboard`, `planner://calendar/2026-10`, `planner://day/today`, `planner://timetable`, `planner://categories`.
+- The address bar shows the page you're on, such as `planner://day/2026-10-01`, and you can type an address to go there. Addresses: `planner://dashboard`, `planner://calendar/2026-10` (or `planner://calendar/2026-10-01` to select a day), `planner://day/today`, `planner://timetable`, `planner://categories`.
 - **Ctrl+click** or middle-click any link or calendar day to open it in a background tab.
 - **Ctrl+1–4** jump to Dashboard, Calendar, today's Day Planner and Categories. **Ctrl+L** focuses the address bar.
 - Your open tabs, their order and their history are restored when you reopen the app.
 
 **Pages**
-- **Dashboard**: today's plans and lessons, the next 7 days, *Unfinished* plans from recent days (with **Move to today**), a two-week history for each routine, and your categories as tiles.
-- **Calendar**: a month grid that grows with the window. Each day shows one dot per plan (in its category color) and a done/total count, and completed days get a green stamp. Click a day to see it in the panel beside the calendar, where its plans stay in time order (checking one crosses it out in place, so nothing jumps). From there you can check off plans, add plans and complete the whole day without leaving the page. You can also drag a plan onto another day to move it there. Double-click a day to open it in the Day Planner. A **This month** bar along the bottom shows days completed, the share of plans done, your longest streak of completed days and your busiest day.
-- **Day Planner**: an *All day* section plus 24 hourly slots on one scrolling page. Click a slot (or **+ New plan**) to schedule something at that hour. Drag plans between hours or into *All day* to move them. While dragging you can scroll with the mouse wheel, and the page also scrolls by itself near the top or bottom edge.
+- **Dashboard**: a *This week* strip (Monday to Sunday with each day's progress, stamps on completed days and deadline flags; click a day to open it), today's plans and lessons, *Up next* (the next lesson and plan with a countdown), your *Deadlines*, the next 7 days, *Your progress* (streak of completed days, plans done this week and this month, lessons attended), *Unfinished* plans from recent days (with **Move to today**), a two-week history for each routine, and your categories as tiles.
+- **Calendar**: a month grid that grows with the window. Each day shows one dot per plan (in its category color) and a done/total count, and completed days get a green stamp. Click a day to see it in the panel beside the calendar, where its plans stay in time order (checking one crosses it out in place, so nothing jumps). From there you can check off plans, add plans and complete the whole day without leaving the page. You can also drag a plan onto another day to move it there. Days with a deadline show a small flag. Double-click a day to open it in the Day Planner. A **This month** bar along the bottom shows days completed, the share of plans done, your longest streak of completed days and your busiest day.
+- **Day Planner**: an *All day* section plus 24 hourly slots on one scrolling page. It opens at the top; on today, **Now** scrolls to the current hour. Plans at the same time sit side by side, and a plan that starts between hours (say 03:05) gets its own 03:05 line under 03:00. Click a slot (or **+ New plan**) to schedule something at that time. A *Due soon* bar at the top lists deadlines still ahead. Drag plans between hours or into *All day* to move them. While dragging you can scroll with the mouse wheel, and the page also scrolls by itself near the top or bottom edge.
 - **Week**: Monday to Sunday side by side with an hour scale. It shows your lessons and plans as blocks sized by how long they take. Click an empty slot to add a plan there, or drag a plan to another day or hour.
 - **Timetable**: your weekly school (or work) schedule, set up once. See [Timetable](#timetable) below.
 - **History**: a compact record of your past days. Each day is one line (✓ done · ✗ missed); click it to see exactly which plans were done and which weren't. Filter to days with missed plans or days where everything was done, and load older days as needed.
@@ -63,11 +63,11 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 - **Categories**: create, rename, recolor and delete categories. Each category has its own page with:
   - an icon (emoji), a description and any color, set under **Customize**;
   - stats: % done over the last 4 weeks, this week's progress, upcoming and repeating plans, and a 4-week chart;
-  - tabs for *All* (the default: every plan, done or not, in one list), *Upcoming*, *Done*, *Missed*, *Repeating* and *Lessons*, with search and sorting.
+  - everything in the category on one page, in sections: *Overdue*, *Today*, *Upcoming* (grouped by day), *Deadlines*, *Repeating*, *Lessons* (as a small weekly timetable) and *Done* (folded away; click to open). The search box filters every section.
 
 **Categories sidebar**: create (`+`), rename (✎ or double-click), delete (🗑), and select (click) categories. Assign a plan to a category in the plan dialog, or drag a plan onto a category in the sidebar. Deleting a category keeps its plans; they just have no category any more.
 
-**Plans**: each plan has a title, date, a start and optional end time such as 08:30–09:10 (or *All day*), a category, notes and an optional repeat. Edit with ✎ (or double-click), delete with 🗑, and move by dragging or by changing the date and time in the edit dialog.
+**Plans**: each plan has a title, date, a start and optional end time such as 08:30–09:10 (or *All day*), a category, notes and an optional repeat. Edit with the pencil button (or double-click), delete with the trash button, and move by dragging or by changing the date and time in the edit dialog.
 
 **Check marks**
 - Each plan has a round check button. Checking it presses in a green stamp, and the plan is crossed out. Clicking again undoes it.
@@ -84,6 +84,12 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 - Past check marks are kept as history. The Dashboard and category pages show a two-week tracker and your current streak.
 - When editing, moving or deleting a repeating plan, you choose between *only this day* and *all occurrences*.
 
+**Deadlines**: for things that must be done *by* a day rather than *on* it, such as homework. Right-click a day in the Calendar or Week view and choose **Add deadline…**, use **Add deadline** in the Calendar's day panel, or **+ Add deadline** on the Dashboard. A deadline has a title, a due date, an optional time, a category and notes, and you can edit or move it at any time.
+- The Dashboard lists open deadlines with a countdown (*Due in 3 days*, *Due tomorrow*, *Overdue by 1 day*), colored as the date gets close.
+- It shows in the Day Planner's *Due soon* bar every day until it's due, as a flag on its day in the Calendar, Week view and This-week strip, and in its category's page.
+- Check it off when you're done; Ctrl+Z brings it back.
+- With reminders on, you get a notification the day before and on the day it's due.
+
 ### Timetable
 
 For school lessons (or any fixed weekly schedule), open **Timetable** in the sidebar:
@@ -98,7 +104,7 @@ Each filled cell becomes a weekly lesson in the *School* category, created autom
 
 **Right-click menus**:
 - **Plans:** done/not done, edit, duplicate, copy to tomorrow / to a date / to every day this week, move to today / tomorrow, change category, delete, undo.
-- **Calendar and week days:** open, open in a new tab, add a plan, mark the day complete.
+- **Calendar and week days:** open, open in a new tab, add a plan, add a deadline, mark the day complete.
 - **Lessons:** attended / absent.
 - **Categories in the sidebar:** open in a new tab, rename, customize, delete.
 - **Tabs:** see above.

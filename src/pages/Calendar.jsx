@@ -21,14 +21,18 @@ import LessonStrip from '../components/LessonStrip.jsx';
 import { Progress, QuickAdd } from './DayPlanner.jsx';
 import { dropAttr } from '../components/dragDrop.jsx';
 import { usePlanActions } from '../components/planActions.jsx';
+import { useDeadlineActions, DeadlineItem } from '../components/deadlineActions.jsx';
+import { FlagIcon } from '../components/Icons.jsx';
+import { deadlinesDueOn } from '../lib/recurrence.js';
 
 const MAX_DOTS = 6;
 
-export default function Calendar({ month }) {
+export default function Calendar({ month, date: initialDate }) {
   const { state, dispatch, navigate, today, menu } = useApp();
   const actions = usePlanActions();
+  const deadlineActions = useDeadlineActions();
   // Clicking a day selects it and shows it in the side panel; double-click opens the Day Planner.
-  const [selected, setSelected] = useState(monthOf(today) === month ? today : `${month}-01`);
+  const [selected, setSelected] = useState(initialDate ?? (monthOf(today) === month ? today : `${month}-01`));
   // Stamps only animate for days completed while this page is open.
   const doneOnOpen = useRef(new Set(Object.keys(state.days)));
   const days = monthGrid(month);
@@ -45,6 +49,7 @@ export default function Calendar({ month }) {
       { label: 'Open week', onSelect: () => navigate(paths.week(date)) },
       null,
       { label: 'Add plan…', onSelect: () => actions.create({ date }) },
+      { label: 'Add deadline…', onSelect: () => deadlineActions.create({ due: date }) },
       { label: done ? 'Mark day as not complete' : 'Mark day complete', onSelect: () => dispatch({ type: 'day/setDone', date, done: !done }) },
       null,
       { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: () => dispatch({ type: 'history/undo' }) },
@@ -119,6 +124,11 @@ export default function Calendar({ month }) {
                 >
                   <div className="cell-head">
                     <span className="cell-day">{fromKey(date).getDate()}</span>
+                    {deadlinesDueOn(state.deadlines, date).some((d) => !d.done) && (
+                      <span className="cell-flag" title={deadlinesDueOn(state.deadlines, date).map((d) => d.title).join(', ')} data-testid="cell-flag">
+                        <FlagIcon size={13} />
+                      </span>
+                    )}
                     {plans.length > 0 && (
                       <span className={`cell-count ${done === plans.length ? 'all-done' : ''}`}>
                         {done}/{plans.length}
@@ -152,6 +162,8 @@ export default function Calendar({ month }) {
 
 function SelectedDay({ date, onOpen }) {
   const { state, dispatch, today } = useApp();
+  const deadlineActions = useDeadlineActions();
+  const deadlines = deadlinesDueOn(state.deadlines, date);
   // One list in time order: checking a plan crosses it out in place, so nothing jumps around.
   const plans = tasksOn(state.plans, date);
   const completed = plans.filter((p) => isDone(p, date));
@@ -170,6 +182,16 @@ function SelectedDay({ date, onOpen }) {
       </div>
       {plans.length > 0 && <Progress done={completed.length} total={plans.length} />}
       <div className="selected-body">
+        {deadlines.length > 0 && (
+          <div className="plan-group" data-testid="day-deadlines">
+            <div className="section-label">Deadlines · {deadlines.length}</div>
+            <div className="plan-list">
+              {deadlines.map((d) => (
+                <DeadlineItem key={d.id} deadline={d} />
+              ))}
+            </div>
+          </div>
+        )}
         <LessonStrip date={date} compact />
         {plans.length > 0 && (
           <div className="plan-group" data-testid="day-plans">
@@ -186,9 +208,14 @@ function SelectedDay({ date, onOpen }) {
           onAdd={(title) => dispatch({ type: 'plan/add', plan: { id: newId(), title, date, hour: null } })}
         />
       </div>
-      <button className="link-button open-day" onClick={onOpen}>
-        Open in Day Planner →
-      </button>
+      <div className="panel-footer">
+        <button className="link-button open-day" onClick={onOpen}>
+          Open in Day Planner →
+        </button>
+        <button className="small-button" onClick={() => deadlineActions.create({ due: date })}>
+          <FlagIcon size={13} /> Add deadline
+        </button>
+      </div>
     </section>
   );
 }

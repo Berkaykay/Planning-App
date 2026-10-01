@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context.js';
-import { categoryAll, categoryStats, comparePlans, isDone, isLesson } from '../lib/recurrence.js';
-import { formatShort, formatTimeRange, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../lib/dates.js';
+import { categoryStats, comparePlans, isDone, isLesson, tasksOn } from '../lib/recurrence.js';
+import { formatShort, formatTimeRange, relativeDayLabel, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import PlanItem from '../components/PlanItem.jsx';
 import Link from '../components/Link.jsx';
@@ -9,9 +9,29 @@ import RepeatTracker from '../components/RepeatTracker.jsx';
 import { usePlanActions } from '../components/planActions.jsx';
 import { useCategoryActions, CategoryNameInput } from '../components/categoryActions.jsx';
 import { ColorPicker, IconPicker } from './Categories.jsx';
+import { DeadlineItem } from '../components/deadlineActions.jsx';
 
 const byDate = (a, b) => (a.date === b.date ? comparePlans(a, b) : a.date < b.date ? -1 : 1);
-const byName = (a, b) => a.title.localeCompare(b.title);
+
+// A titled group of items on the category page; hidden when empty.
+function Section({ title, count, children, testId, collapsible = false, open = true, onToggle }) {
+  if (!count) return null;
+  return (
+    <section className="card category-section" data-testid={testId}>
+      <h2 className="section-title">
+        {collapsible ? (
+          <button className="link-button section-toggle" aria-expanded={open} onClick={onToggle}>
+            {open ? '▾' : '▸'} {title}
+          </button>
+        ) : (
+          title
+        )}
+        <span className="tab-count">{count}</span>
+      </h2>
+      {open && children}
+    </section>
+  );
+}
 
 // Everything about one category: its look, how it's going, and its plans.
 export default function CategoryPage({ id }) {
@@ -20,9 +40,8 @@ export default function CategoryPage({ id }) {
   const categoryActions = useCategoryActions();
   const [renaming, setRenaming] = useState(false);
   const [customizing, setCustomizing] = useState(false);
-  const [tab, setTab] = useState('all');
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState('date');
+  const [showDone, setShowDone] = useState(false);
 
   const category = state.categories.find((c) => c.id === id);
   if (!category) {
@@ -40,30 +59,21 @@ export default function CategoryPage({ id }) {
   const all = state.plans.filter((p) => p.categoryId === id);
   const lessons = all.filter(isLesson);
   const tasks = all.filter((p) => !isLesson(p));
-  const oneOff = tasks.filter((p) => !p.repeat);
-  const lists = {
-    upcoming: oneOff.filter((p) => p.date >= today && !isDone(p, p.date)),
-    done: oneOff.filter((p) => isDone(p, p.date)),
-    missed: oneOff.filter((p) => p.date < today && !isDone(p, p.date)),
-    repeating: tasks.filter((p) => p.repeat),
-  };
-  // "All": every plan in one list, done or not, each on its date (repeating ones on their next date).
-  const allEntries = categoryAll(state.plans, id, today);
-  lists.all = allEntries.map((e) => e.plan);
-  const dateOf = new Map(allEntries.map((e) => [e.plan.id, e.date]));
-  const tabs = [
-    { id: 'all', label: 'All' },
-    { id: 'upcoming', label: 'Upcoming' },
-    { id: 'done', label: 'Done' },
-    { id: 'missed', label: 'Missed' },
-    { id: 'repeating', label: 'Repeating' },
-    ...(lessons.length ? [{ id: 'lessons', label: 'Lessons' }] : []),
-  ];
   const q = query.trim().toLowerCase();
   const matches = (p) => !q || p.title.toLowerCase().includes(q) || p.notes.toLowerCase().includes(q);
-  let list = (lists[tab] ?? []).filter(matches);
-  if (tab !== 'all' || sort === 'name') list = [...list].sort(sort === 'name' ? byName : byDate);
-  if (tab === 'done' && sort === 'date') list.reverse();
+  const oneOff = tasks.filter((p) => !p.repeat && matches(p));
+  // Everything is visible at once, organized into sections.
+  const overdue = oneOff.filter((p) => p.date < today && !isDone(p, p.date)).sort(byDate);
+  const todays = tasksOn(state.plans, today).filter((p) => p.categoryId === id && matches(p));
+  const upcoming = oneOff.filter((p) => p.date > today && !isDone(p, p.date)).sort(byDate);
+  const upcomingDates = [...new Set(upcoming.map((p) => p.date))];
+  const deadlines = state.deadlines.filter((d) => d.categoryId === id && matches(d));
+  const openDeadlines = deadlines.filter((d) => !d.done).sort((a, b) => (a.due < b.due ? -1 : 1));
+  const repeating = tasks.filter((p) => p.repeat && matches(p));
+  const shownLessons = lessons.filter(matches);
+  const done = [...oneOff.filter((p) => p.date !== today && isDone(p, p.date)).sort(byDate).reverse()];
+  const doneDeadlines = deadlines.filter((d) => d.done);
+  const nothing = !overdue.length && !todays.length && !upcoming.length && !deadlines.length && !repeating.length && !shownLessons.length && !done.length;
   const stats = categoryStats(state.plans, id, today);
   const maxWeek = Math.max(1, ...stats.weeks.map((w) => w.total));
 
@@ -166,41 +176,77 @@ export default function CategoryPage({ id }) {
       </section>
 
       <div className="category-toolbar">
-        <div className="segmented" role="tablist" aria-label="Show">
-          {tabs.map((t) => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-              {t.label}
-              <span className="tab-count">{t.id === 'lessons' ? lessons.length : lists[t.id].length}</span>
-            </button>
-          ))}
-        </div>
-        <input className="search" type="search" aria-label="Search plans" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        {tab !== 'lessons' && tab !== 'repeating' && (
-          <select aria-label="Sort" value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="date">Sort by date</option>
-            <option value="name">Sort by name</option>
-          </select>
-        )}
+        <input className="search" type="search" aria-label="Search plans" placeholder="Search this category…" value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
 
-      <section className="card category-list-card" data-testid="category-list">
-        {tab === 'lessons' ? (
-          <LessonWeek lessons={lessons.filter(matches)} />
-        ) : tab === 'repeating' ? (
-          list.map((p) => <RepeatTracker key={p.id} plan={p} editable />)
-        ) : (
-          <div className="plan-list">
-            {list.map((p) => (
-              <PlanItem key={p.id} plan={p} date={dateOf.get(p.id) ?? p.date} showDate />
-            ))}
+      {nothing && <p className="empty">{q ? 'Nothing matches your search.' : 'No plans in this category yet.'}</p>}
+
+      <Section title="Overdue" count={overdue.length} testId="section-overdue">
+        <div className="plan-list">
+          {overdue.map((p) => (
+            <PlanItem key={p.id} plan={p} date={p.date} showDate />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Today" count={todays.length} testId="section-today">
+        <div className="plan-list">
+          {todays.map((p) => (
+            <PlanItem key={p.id} plan={p} date={today} />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Upcoming" count={upcoming.length} testId="section-upcoming">
+        {upcomingDates.map((date) => (
+          <div key={date} className="date-group">
+            <div className="section-label">{relativeDayLabel(date, today)}</div>
+            <div className="plan-list">
+              {upcoming
+                .filter((p) => p.date === date)
+                .map((p) => (
+                  <PlanItem key={p.id} plan={p} date={date} />
+                ))}
+            </div>
           </div>
-        )}
-        {tab !== 'lessons' && list.length === 0 && (
-          <p className="empty">
-            {q ? 'No plans match your search.' : { all: 'No plans in this category yet.', upcoming: 'Nothing coming up.', done: 'Nothing completed yet.', missed: 'Nothing missed. Nice!', repeating: 'No repeating plans.' }[tab]}
-          </p>
-        )}
-      </section>
+        ))}
+      </Section>
+
+      <Section title="Deadlines" count={openDeadlines.length} testId="section-deadlines">
+        <div className="plan-list">
+          {openDeadlines.map((d) => (
+            <DeadlineItem key={d.id} deadline={d} />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Repeating" count={repeating.length} testId="section-repeating">
+        {repeating.map((p) => (
+          <RepeatTracker key={p.id} plan={p} editable />
+        ))}
+      </Section>
+
+      <Section title="Lessons" count={shownLessons.length} testId="section-lessons">
+        <LessonWeek lessons={shownLessons} />
+      </Section>
+
+      <Section
+        title="Done"
+        count={done.length + doneDeadlines.length}
+        testId="section-done"
+        collapsible
+        open={showDone || Boolean(q)}
+        onToggle={() => setShowDone(!showDone)}
+      >
+        <div className="plan-list">
+          {done.map((p) => (
+            <PlanItem key={p.id} plan={p} date={p.date} showDate />
+          ))}
+          {doneDeadlines.map((d) => (
+            <DeadlineItem key={d.id} deadline={d} />
+          ))}
+        </div>
+      </Section>
     </div>
   );
 }

@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useApp } from '../context.js';
 import { tasksOn, isDone } from '../lib/recurrence.js';
-import { addDays, formatHour, formatLong, isDateKey, relativeDayLabel } from '../lib/dates.js';
+import { addDays, formatLong, formatTime, isDateKey, relativeDayLabel } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import { newId } from '../lib/store.js';
 import PlanItem from '../components/PlanItem.jsx';
@@ -9,6 +9,7 @@ import { dropAttr } from '../components/dragDrop.jsx';
 import Check from '../components/Check.jsx';
 import Link from '../components/Link.jsx';
 import LessonStrip from '../components/LessonStrip.jsx';
+import { DueSoonBar } from '../components/deadlineActions.jsx';
 import { usePlanActions } from '../components/planActions.jsx';
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -24,23 +25,26 @@ export default function DayPlanner({ date }) {
   const dayDone = Boolean(state.days[date]?.done);
   const nowHour = new Date().getHours();
 
-  // Start scrolled so the first relevant hour is visible: for today, the current hour or an
-  // earlier unfinished plan; for other days, the first plan or 08:00.
-  useEffect(() => {
-    const hours = plans.filter((p) => p.hour !== null && (date !== today || !isDone(p, date))).map((p) => p.hour);
-    const first = Math.min(date === today ? Math.max(0, nowHour - 1) : 8, ...hours);
-    // The whole page scrolls (not just the hours), so scroll the page to that hour.
-    const row = gridRef.current?.querySelector(`[data-hour="${first}"]`);
+  // The page opens at the top; "Now" scrolls the current hour to about a third of the way down.
+  const scrollToNow = () => {
+    const row = gridRef.current?.querySelector(`[data-hour="${nowHour}"]`);
     const page = gridRef.current?.closest('.page');
-    // Put that hour about a third of the way down the window, so what comes before stays in view.
-    if (row && page && first > 0) {
-      page.scrollTop = row.getBoundingClientRect().top - page.getBoundingClientRect().top - page.clientHeight / 3;
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!row || !page) return;
+    const top = page.scrollTop + row.getBoundingClientRect().top - page.getBoundingClientRect().top - page.clientHeight / 3;
+    page.scrollTo({ top, behavior: 'smooth' });
+  };
 
-  const hourMenu = (e, hour) =>
+  // One line per hour, plus a line of its own for every other start time in use (e.g. 03:05).
+  const rows = [];
+  for (const hour of HOURS) {
+    rows.push({ hour, minute: 0 });
+    const minutes = [...new Set(plans.filter((p) => p.hour === hour && p.minute > 0).map((p) => p.minute))].sort((a, b) => a - b);
+    for (const minute of minutes) rows.push({ hour, minute });
+  }
+
+  const hourMenu = (e, hour, minute = 0) =>
     menu.open(e, [
-      { label: `Add plan at ${formatHour(hour)}`, onSelect: () => actions.create({ date, hour }) },
+      { label: `Add plan at ${formatTime(hour, minute)}`, onSelect: () => actions.create({ date, hour, minute }) },
       { label: 'Add all-day plan', onSelect: () => actions.create({ date }) },
       null,
       { label: dayDone ? 'Mark day as not complete' : 'Mark day complete', onSelect: () => dispatch({ type: 'day/setDone', date, done: !dayDone }) },
@@ -66,6 +70,11 @@ export default function DayPlanner({ date }) {
             value={date}
             onChange={(e) => isDateKey(e.target.value) && navigate(paths.day(e.target.value))}
           />
+          {date === today && (
+            <button className="button" title="Scroll to the current hour" onClick={scrollToNow}>
+              Now
+            </button>
+          )}
         </div>
         <div className="day-title">
           <Check
@@ -87,6 +96,7 @@ export default function DayPlanner({ date }) {
         <Progress done={doneCount} total={plans.length} />
       </header>
 
+      <DueSoonBar date={date} />
       <LessonStrip date={date} />
 
       <section className="all-day">
@@ -105,28 +115,26 @@ export default function DayPlanner({ date }) {
       </section>
 
       <section className="hour-grid" ref={gridRef} aria-label="Hourly schedule">
-        {HOURS.map((hour) => {
-          const items = plans.filter((p) => p.hour === hour);
+        {rows.map(({ hour, minute }) => {
+          // Plans at the same time sit side by side.
+          const items = plans.filter((p) => p.hour === hour && p.minute === minute);
+          const label = formatTime(hour, minute);
           return (
             <DropZone
-              key={hour}
-              target={{ kind: 'slot', date, hour }}
-              onContextMenu={(e) => hourMenu(e, hour)}
-              className={`hour-row ${date === today && hour === nowHour ? 'now' : ''}`}
-              testId={`hour-${hour}`}
-              dataHour={hour}
+              key={`${hour}:${minute}`}
+              target={{ kind: 'slot', date, hour, minute }}
+              onContextMenu={(e) => hourMenu(e, hour, minute)}
+              className={`hour-row ${minute ? 'minute-row' : ''} ${date === today && hour === nowHour && !minute ? 'now' : ''}`}
+              testId={minute ? `time-${label.replace(':', '-')}` : `hour-${hour}`}
+              dataHour={minute ? undefined : hour}
             >
-              <div className="hour-label">{formatHour(hour)}</div>
-              <div className="hour-plans" onClick={(e) => e.target === e.currentTarget && actions.create({ date, hour })}>
+              <div className="hour-label">{label}</div>
+              <div className="hour-plans" onClick={(e) => e.target === e.currentTarget && actions.create({ date, hour, minute })}>
                 {items.map((p) => (
                   <PlanItem key={p.id} plan={p} date={date} />
                 ))}
-                <button
-                  className="hour-add"
-                  aria-label={`Add plan at ${formatHour(hour)}`}
-                  onClick={() => actions.create({ date, hour })}
-                >
-                  + Add at {formatHour(hour)}
+                <button className="hour-add" aria-label={`Add plan at ${label}`} onClick={() => actions.create({ date, hour, minute })}>
+                  + Add at {label}
                 </button>
               </div>
             </DropZone>

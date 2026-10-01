@@ -139,7 +139,7 @@ test('history shows past days, and unfinished plans can be moved to today (with 
   await expect(page.getByTestId('unfinished')).toHaveCount(0);
 });
 
-test('category page: customize icon, description and color; filter, search and stats', async () => {
+test('category page: customize icon, description and color; sections, search and stats', async () => {
   const cat = { id: 'p', name: 'Personal', color: '#5b7fd6' };
   await start(
     normalizeData({
@@ -165,23 +165,28 @@ test('category page: customize icon, description and color; filter, search and s
   await page.getByLabel('Category description').blur();
   await expect.poll(() => readData(dataDir).categories[0].description).toBe('Life admin');
 
-  const list = page.getByTestId('category-list');
-  // "All" is the default: every plan, done or not, in one list ordered by date.
-  await expect(page.getByRole('tab', { name: /All/ })).toHaveAttribute('aria-selected', 'true');
-  await expect(list.getByTestId('plan').locator('.plan-title')).toHaveText(['Return library book', 'Renew passport', 'Buy gift', 'Book flights']);
-  await page.getByRole('tab', { name: /Upcoming/ }).click();
-  await expect(list.getByTestId('plan')).toHaveCount(2); // upcoming
+  // Everything is visible at once, grouped into sections.
+  const titles = (id) => page.getByTestId(id).getByTestId('plan').locator('.plan-title');
+  await expect(page.locator('.category-page').getByRole('tab')).toHaveCount(0);
+  await expect(titles('section-overdue')).toHaveText(['Return library book']);
+  await expect(titles('section-today')).toHaveText(['Renew passport']);
+  await expect(titles('section-upcoming')).toHaveText(['Buy gift', 'Book flights']);
+  await expect(page.getByTestId('section-upcoming').locator('.date-group')).toHaveCount(2);
+  // Done plans from other days are tucked away in a collapsed section.
+  await expect(page.getByTestId('section-done')).toHaveCount(0);
+  await check('Return library book').click();
+  await expect(page.getByTestId('section-overdue')).toHaveCount(0);
+  const doneToggle = page.getByTestId('section-done').getByRole('button', { name: /Done/ });
+  await expect(doneToggle).toHaveAttribute('aria-expanded', 'false');
+  await doneToggle.click();
+  await expect(titles('section-done')).toHaveText(['Return library book']);
+
+  // Search filters every section.
   await page.getByLabel('Search plans').fill('flight');
-  await expect(list.getByTestId('plan')).toHaveCount(1);
-  await expect(list).toContainText('Book flights');
-  await page.getByLabel('Search plans').fill('');
-  await page.getByRole('tab', { name: /Done/ }).click();
-  await expect(list).toContainText('Renew passport');
-  await page.getByRole('tab', { name: /Missed/ }).click();
-  await expect(list).toContainText('Return library book');
-  await page.getByLabel('Sort').selectOption('name');
-  await page.getByRole('tab', { name: /Upcoming/ }).click();
-  await expect(list.getByTestId('plan').first()).toContainText('Book flights');
+  await expect(titles('section-upcoming')).toHaveText(['Book flights']);
+  await expect(page.getByTestId('section-today')).toHaveCount(0);
+  await page.getByLabel('Search plans').fill('zzz');
+  await expect(page.getByText('Nothing matches your search.')).toBeVisible();
 });
 
 test('undo with Ctrl+Z and the right-click Undo', async () => {

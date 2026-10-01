@@ -4,7 +4,7 @@ import { isDateKey, parseTime } from './dates.js';
 import { HOME } from './routes.js';
 import { FREQUENCIES, tasksOn, isDone } from './recurrence.js';
 
-export const DATA_VERSION = 4;
+export const DATA_VERSION = 5;
 const MAX_HISTORY = 100;
 
 // Muted colors: categories show up as small dots and thin markers, not big colored areas.
@@ -43,6 +43,7 @@ export function createInitialData() {
     plans: [],
     days: {},
     timetables: [],
+    deadlines: [],
     settings: { ...DEFAULT_SETTINGS },
     session: { tabs: [tab], activeTabId: tab.id, closed: [] },
   };
@@ -89,6 +90,22 @@ export function normalizePlan(raw) {
     createdAt: raw.createdAt || new Date().toISOString(),
     // Plans generated from a timetable remember which timetable cell they came from.
     ...(raw.timetableId && { timetableId: raw.timetableId, timetableKey: raw.timetableKey }),
+  };
+}
+
+// A deadline: something to finish by a date (and optionally a time), not on a specific day.
+export function normalizeDeadline(raw) {
+  const hour = intIn(raw.hour, 0, 23) ? raw.hour : null;
+  return {
+    id: raw.id || newId(),
+    title: String(raw.title ?? '').trim() || 'Untitled deadline',
+    due: raw.due,
+    hour,
+    minute: hour !== null && intIn(raw.minute, 0, 59) ? raw.minute : 0,
+    categoryId: raw.categoryId || null,
+    notes: String(raw.notes ?? ''),
+    done: Boolean(raw.done),
+    createdAt: raw.createdAt || new Date().toISOString(),
   };
 }
 
@@ -178,6 +195,10 @@ export function normalizeData(raw) {
   if (!tabs.length) tabs = [newTab()];
   tabs = pinnedFirst(tabs);
   const activeTabId = tabs.some((t) => t.id === raw.session?.activeTabId) ? raw.session.activeTabId : tabs[0].id;
+  const deadlines = (Array.isArray(raw.deadlines) ? raw.deadlines : [])
+    .filter((d) => d && isDateKey(d.due))
+    .map(normalizeDeadline)
+    .map((d) => (d.categoryId && !categoryIds.has(d.categoryId) ? { ...d, categoryId: null } : d));
   const timetables = (Array.isArray(raw.timetables) ? raw.timetables : [])
     .filter((t) => t?.id && isDateKey(t.startDate))
     .map(normalizeTimetable);
@@ -197,6 +218,7 @@ export function normalizeData(raw) {
     plans,
     days,
     timetables,
+    deadlines,
     settings,
     session: { tabs, activeTabId, closed },
   };
@@ -310,6 +332,7 @@ export function reducer(state, action) {
         categories: state.categories.filter((c) => c.id !== action.id),
         plans: state.plans.map((p) => (p.categoryId === action.id ? { ...p, categoryId: null } : p)),
         timetables: state.timetables.map((t) => (t.categoryId === action.id ? { ...t, categoryId: null } : t)),
+        deadlines: state.deadlines.map((d) => (d.categoryId === action.id ? { ...d, categoryId: null } : d)),
       };
 
     // ---- Plans ------------------------------------------------------------
@@ -418,6 +441,17 @@ export function reducer(state, action) {
         plans: state.plans.map((p) => (ids.has(p.id) ? setDoneOn(p, action.date, action.done) : p)),
       };
     }
+
+    // ---- Deadlines --------------------------------------------------------
+    case 'deadline/add':
+      return { ...state, deadlines: [...state.deadlines, normalizeDeadline(action.deadline)] };
+    case 'deadline/update':
+      return {
+        ...state,
+        deadlines: state.deadlines.map((d) => (d.id === action.id ? normalizeDeadline({ ...d, ...action.changes }) : d)),
+      };
+    case 'deadline/delete':
+      return { ...state, deadlines: state.deadlines.filter((d) => d.id !== action.id) };
 
     // ---- Timetables -------------------------------------------------------
     case 'timetable/save': {
