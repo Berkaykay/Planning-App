@@ -237,3 +237,15 @@ test('browser-style title bar: app icon in the tab strip, no menu bar on Alt, sh
   if (area) expect(await page.getByRole('button', { name: 'New tab' }).evaluate((el) => el.getBoundingClientRect().right)).toBeLessThanOrEqual(area);
   expect(bar.height).toBe(40);
 });
+
+test('clicking a submenu item that hovering already opened keeps the submenu open', async () => {
+  await start(normalizeData({ categories: [{ id: 'w', name: 'Work', color: '#4f9d7e' }], plans: [P({ id: 'a', title: 'Report', date: today })] }));
+  await plan('Report').click({ button: 'right' });
+  const category = page.getByRole('menuitem', { name: 'Category', exact: true });
+  await category.hover();
+  await expect(menuItem('Work')).toBeVisible();
+  await category.click();
+  await expect(menuItem('Work')).toBeVisible();
+  await menuItem('Work').click();
+  await expect(plan('Report')).toContainText('Work');
+});

@@ -65,7 +65,9 @@ function MenuList({ items, x, y, onClose, root = false }) {
               className={`${item.danger ? 'danger' : ''} ${openSub === i ? 'open' : ''}`}
               onClick={(e) => {
                 if (item.children) {
-                  setOpenSub(openSub === i ? null : i);
+                  // Always open (never toggle): hovering has usually opened it already, and a
+                  // toggle would race with that and sometimes close it again.
+                  setOpenSub(i);
                   return;
                 }
                 e.stopPropagation();
