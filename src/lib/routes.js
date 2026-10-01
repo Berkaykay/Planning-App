@@ -22,7 +22,9 @@ export function parseRoute(path) {
     case 'categories':
       return param === undefined ? { page: 'categories' } : { page: 'notfound', path: clean };
     case 'timetable':
-      return param === undefined ? { page: 'timetable' } : { page: 'notfound', path: clean };
+    case 'history':
+    case 'settings':
+      return param === undefined ? { page: page.toLowerCase() } : { page: 'notfound', path: clean };
     case 'category':
       return param ? { page: 'category', id: param } : { page: 'categories' };
     default:
@@ -36,6 +38,8 @@ export const paths = {
   day: (date) => `day/${date}`,
   categories: () => 'categories',
   timetable: () => 'timetable',
+  history: () => 'history',
+  settings: () => 'settings',
   category: (id) => `category/${id}`,
 };
 
@@ -51,6 +55,10 @@ export function routeTitle(route, categories) {
       return 'Categories';
     case 'timetable':
       return 'Timetable';
+    case 'history':
+      return 'History';
+    case 'settings':
+      return 'Settings';
     case 'category':
       return categories.find((c) => c.id === route.id)?.name ?? 'Missing category';
     default:
@@ -59,4 +67,4 @@ export function routeTitle(route, categories) {
 }
 
 export const routeIcon = (route) =>
-  ({ dashboard: '◧', calendar: '▦', day: '☰', timetable: '▤', categories: '◉', category: '●' })[route.page] ?? '⚠';
+  ({ dashboard: '◧', calendar: '▦', day: '☰', timetable: '▤', history: '↺', categories: '◉', category: '●', settings: '⚙' })[route.page] ?? '⚠';

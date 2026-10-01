@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useApp } from '../context.js';
-import { plansOn, isDone, monthStats } from '../lib/recurrence.js';
+import { tasksOn, isDone, monthStats } from '../lib/recurrence.js';
 import {
   addMonths,
   formatLong,
@@ -15,54 +15,57 @@ import {
 import { paths } from '../lib/routes.js';
 import { newId } from '../lib/store.js';
 import Link from '../components/Link.jsx';
-import Check from '../components/Check.jsx';
+import Check, { DayStamp } from '../components/Check.jsx';
 import PlanItem from '../components/PlanItem.jsx';
+import LessonStrip from '../components/LessonStrip.jsx';
 import { Progress, QuickAdd } from './DayPlanner.jsx';
 
 const MAX_DOTS = 6;
 
 export default function Calendar({ month }) {
-  const { state, dispatch, navigate, today } = useApp();
+  const { state, navigate, today } = useApp();
   // Clicking a day selects it and shows it in the side panel; double-click opens the Day Planner.
   const [selected, setSelected] = useState(monthOf(today) === month ? today : `${month}-01`);
+  // Stamps only animate for days completed while this page is open.
+  const doneOnOpen = useRef(new Set(Object.keys(state.days)));
   const days = monthGrid(month);
   const colors = Object.fromEntries(state.categories.map((c) => [c.id, c.color]));
 
   const openDay = (date, e) =>
     navigate(paths.day(date), { newTab: Boolean(e?.ctrlKey || e?.metaKey), background: true });
 
-  const onCellClick = (date, e) => {
-    if (e.ctrlKey || e.metaKey) return openDay(date, e);
-    setSelected(date);
-  };
-
   return (
     <div className="calendar-page">
-      <header className="page-header row">
-        <h1>{formatMonth(month)}</h1>
-        <div className="day-nav">
-          <Link to={paths.calendar(addMonths(month, -1))} className="button icon-only" aria-label="Previous month">
+      <header className="month-header">
+        <div className="month-nav">
+          <Link to={paths.calendar(addMonths(month, -1))} className="button icon-only" aria-label="Previous month" title="Previous month">
             ‹
           </Link>
-          <Link to={paths.calendar(monthOf(today))} className={`button ${month === monthOf(today) ? 'current' : ''}`}>
-            This month
-          </Link>
-          <Link to={paths.calendar(addMonths(month, 1))} className="button icon-only" aria-label="Next month">
+          <h1>{formatMonth(month)}</h1>
+          <Link to={paths.calendar(addMonths(month, 1))} className="button icon-only" aria-label="Next month" title="Next month">
             ›
+          </Link>
+          <Link to={paths.calendar(monthOf(today))} className={`button this-month ${month === monthOf(today) ? 'current' : ''}`}>
+            This month
           </Link>
         </div>
       </header>
 
-      <div className="calendar-layout">
+      <div className="calendar-top">
         <div className="calendar-column">
-          <div className="calendar-grid" role="grid" aria-label={formatMonth(month)}>
+          <div
+            className="calendar-grid"
+            role="grid"
+            aria-label={formatMonth(month)}
+            title="Click a day to see it on the right. Double-click opens it in the Day Planner; Ctrl+click opens it in a new tab."
+          >
             {WEEKDAY_ORDER.map((d) => (
               <div key={d} className="weekday-head" role="columnheader">
                 {WEEKDAY_NAMES[d]}
               </div>
             ))}
             {days.map((date) => {
-              const plans = plansOn(state.plans, date);
+              const plans = tasksOn(state.plans, date);
               const done = plans.filter((p) => isDone(p, date)).length;
               const dayDone = Boolean(state.days[date]?.done);
               const classes = [
@@ -81,7 +84,7 @@ export default function Calendar({ month }) {
                   aria-label={`${formatLong(date)}: ${plans.length ? `${done} of ${plans.length} plans done` : 'no plans'}${dayDone ? ', day complete' : ''}`}
                   tabIndex={0}
                   data-testid={`cell-${date}`}
-                  onClick={(e) => onCellClick(date, e)}
+                  onClick={(e) => (e.ctrlKey || e.metaKey ? openDay(date, e) : setSelected(date))}
                   onDoubleClick={() => openDay(date)}
                   onAuxClick={(e) => e.button === 1 && openDay(date, { ctrlKey: true })}
                   onKeyDown={(e) => {
@@ -94,13 +97,13 @@ export default function Calendar({ month }) {
                 >
                   <div className="cell-head">
                     <span className="cell-day">{fromKey(date).getDate()}</span>
-                    {(plans.length > 0 || dayDone) && (
-                      <span className={`cell-count ${dayDone || (plans.length && done === plans.length) ? 'all-done' : ''}`}>
-                        {dayDone && '✓ '}
-                        {plans.length > 0 && `${done}/${plans.length}`}
+                    {plans.length > 0 && (
+                      <span className={`cell-count ${done === plans.length ? 'all-done' : ''}`}>
+                        {done}/{plans.length}
                       </span>
                     )}
                   </div>
+                  {dayDone && <DayStamp animate={!doneOnOpen.current.has(date)} />}
                   {/* One dot per plan (faded when done), in its category color. */}
                   <span className="cell-dots" aria-hidden>
                     {plans.slice(0, MAX_DOTS).map((p) => (
@@ -115,49 +118,62 @@ export default function Calendar({ month }) {
               );
             })}
           </div>
-          <p className="hint">Click a day to see it on the right. Double-click opens it in the Day Planner; Ctrl+click opens it in a new tab.</p>
         </div>
 
-        <aside className="calendar-side">
-          <SelectedDay date={selected} onOpen={() => openDay(selected)} />
-          <MonthStats month={month} />
-        </aside>
+        <SelectedDay date={selected} onOpen={() => openDay(selected)} />
       </div>
+
+      <MonthStats month={month} />
     </div>
   );
 }
 
 function SelectedDay({ date, onOpen }) {
   const { state, dispatch, today } = useApp();
-  const plans = plansOn(state.plans, date);
-  const done = plans.filter((p) => isDone(p, date)).length;
+  const plans = tasksOn(state.plans, date);
+  const todo = plans.filter((p) => !isDone(p, date));
+  const completed = plans.filter((p) => isDone(p, date));
   const dayDone = Boolean(state.days[date]?.done);
   return (
     <section className={`card selected-day ${dayDone ? 'day-done' : ''}`} aria-label="Selected day" data-testid="selected-day">
       <div className="card-head">
-        <Check
-          checked={dayDone}
-          onChange={(value) => dispatch({ type: 'day/setDone', date, done: value })}
-          label={`Mark ${date} complete`}
-        />
+        <Check checked={dayDone} onChange={(value) => dispatch({ type: 'day/setDone', date, done: value })} label={`Mark ${date} complete`} />
         <div className="selected-title">
           <h2 className="day-heading">{formatLong(date)}</h2>
           <span className="subtle">
             {date === today ? 'Today · ' : ''}
-            {plans.length ? `${done} of ${plans.length} done` : 'No plans'}
+            {plans.length ? `${completed.length} of ${plans.length} done` : 'No plans'}
           </span>
         </div>
       </div>
-      {plans.length > 0 && <Progress done={done} total={plans.length} />}
-      <div className="plan-list">
-        {plans.map((p) => (
-          <PlanItem key={p.id} plan={p} date={date} />
-        ))}
+      {plans.length > 0 && <Progress done={completed.length} total={plans.length} />}
+      <div className="selected-body">
+        <LessonStrip date={date} compact />
+        {todo.length > 0 && (
+          <div className="plan-group" data-testid="todo">
+            <div className="section-label">To do · {todo.length}</div>
+            <div className="plan-list">
+              {todo.map((p) => (
+                <PlanItem key={p.id} plan={p} date={date} />
+              ))}
+            </div>
+          </div>
+        )}
+        {completed.length > 0 && (
+          <div className="plan-group" data-testid="completed">
+            <div className="section-label">Completed · {completed.length}</div>
+            <div className="plan-list">
+              {completed.map((p) => (
+                <PlanItem key={p.id} plan={p} date={date} />
+              ))}
+            </div>
+          </div>
+        )}
+        <QuickAdd
+          placeholder={`Add a plan for ${formatMedium(date)}`}
+          onAdd={(title) => dispatch({ type: 'plan/add', plan: { id: newId(), title, date, hour: null } })}
+        />
       </div>
-      <QuickAdd
-        placeholder={`Add a plan for ${formatMedium(date)}`}
-        onAdd={(title) => dispatch({ type: 'plan/add', plan: { id: newId(), title, date, hour: null } })}
-      />
       <button className="link-button open-day" onClick={onOpen}>
         Open in Day Planner →
       </button>
@@ -199,12 +215,13 @@ function MonthStats({ month }) {
         </div>
         <div>
           <dt>Busiest day</dt>
-          <dd className="busiest">{s.busiest ? `${formatMedium(s.busiest)}` : '–'}
+          <dd className="busiest">
+            {s.busiest ? formatMedium(s.busiest) : '–'}
             {s.busiest && <small> {s.busiestCount} plans</small>}
           </dd>
         </div>
       </dl>
-      {s.plansTotal > 0 && <Progress done={s.plansDone} total={s.plansTotal} />}
+      <Progress done={s.plansDone} total={s.plansTotal} />
     </section>
   );
 }

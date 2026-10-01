@@ -4,7 +4,7 @@ import { isDateKey, parseTime } from './dates.js';
 import { HOME } from './routes.js';
 import { FREQUENCIES } from './recurrence.js';
 
-export const DATA_VERSION = 2;
+export const DATA_VERSION = 3;
 const MAX_HISTORY = 100;
 
 // Muted colors: categories show up as small dots and thin markers, not big colored areas.
@@ -19,7 +19,13 @@ const OLD_COLORS = {
 };
 
 export const THEMES = ['system', 'light', 'dark'];
-const DEFAULT_SETTINGS = { theme: 'system' };
+const DEFAULT_SETTINGS = {
+  theme: 'system',
+  // Desktop notification `minutes` before a timed plan (and optionally a lesson) starts.
+  reminders: { enabled: true, minutes: 10, lessons: false },
+};
+const MAX_CLOSED_TABS = 10;
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 export const newId = () => globalThis.crypto.randomUUID();
 
@@ -38,7 +44,7 @@ export function createInitialData() {
     days: {},
     timetables: [],
     settings: { ...DEFAULT_SETTINGS },
-    session: { tabs: [tab], activeTabId: tab.id },
+    session: { tabs: [tab], activeTabId: tab.id, closed: [] },
   };
 }
 
@@ -135,7 +141,13 @@ export function normalizeData(raw) {
   if (!raw || typeof raw !== 'object') return createInitialData();
   const categories = (Array.isArray(raw.categories) ? raw.categories : [])
     .filter((c) => c && c.id && typeof c.name === 'string')
-    .map((c) => ({ id: c.id, name: c.name, color: OLD_COLORS[c.color] ?? (c.color || CATEGORY_COLORS[0]) }));
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      color: OLD_COLORS[c.color] ?? (HEX_COLOR.test(c.color) ? c.color : CATEGORY_COLORS[0]),
+      icon: typeof c.icon === 'string' ? c.icon.slice(0, 8) : '',
+      description: typeof c.description === 'string' ? c.description : '',
+    }));
   const categoryIds = new Set(categories.map((c) => c.id));
   const plans = (Array.isArray(raw.plans) ? raw.plans : [])
     .filter((p) => p && isDateKey(p.date))
@@ -151,18 +163,37 @@ export function normalizeData(raw) {
       id: t.id,
       history: t.history.map(String),
       index: Math.min(Math.max(0, t.index | 0), t.history.length - 1),
+      ...(t.pinned && { pinned: true }),
     }));
   if (!tabs.length) tabs = [newTab()];
+  tabs = pinnedFirst(tabs);
   const activeTabId = tabs.some((t) => t.id === raw.session?.activeTabId) ? raw.session.activeTabId : tabs[0].id;
   const timetables = (Array.isArray(raw.timetables) ? raw.timetables : [])
     .filter((t) => t?.id && isDateKey(t.startDate))
     .map(normalizeTimetable);
+  const r = raw.settings?.reminders ?? {};
   const settings = {
-    ...DEFAULT_SETTINGS,
-    ...(THEMES.includes(raw.settings?.theme) && { theme: raw.settings.theme }),
+    theme: THEMES.includes(raw.settings?.theme) ? raw.settings.theme : DEFAULT_SETTINGS.theme,
+    reminders: {
+      enabled: typeof r.enabled === 'boolean' ? r.enabled : DEFAULT_SETTINGS.reminders.enabled,
+      minutes: Number.isInteger(r.minutes) && r.minutes >= 0 && r.minutes <= 240 ? r.minutes : DEFAULT_SETTINGS.reminders.minutes,
+      lessons: typeof r.lessons === 'boolean' ? r.lessons : DEFAULT_SETTINGS.reminders.lessons,
+    },
   };
-  return { version: DATA_VERSION, categories, plans, days, timetables, settings, session: { tabs, activeTabId } };
+  const closed = (raw.session?.closed ?? []).filter((c) => c?.tab?.id && Array.isArray(c.tab.history)).slice(-MAX_CLOSED_TABS);
+  return {
+    version: DATA_VERSION,
+    categories,
+    plans,
+    days,
+    timetables,
+    settings,
+    session: { tabs, activeTabId, closed },
+  };
 }
+
+// Pinned tabs always stay at the left, in their existing order.
+const pinnedFirst = (tabs) => [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)];
 
 export const activeTab = (state) =>
   state.session.tabs.find((t) => t.id === state.session.activeTabId) ?? state.session.tabs[0];
@@ -195,6 +226,28 @@ function applyPlanChanges(plan, changes) {
   return next;
 }
 
+// Closes tabs, remembering them for "Reopen closed tab". `keepActive` stays selected if given.
+function closeTabs(state, ids, keepActive) {
+  const { tabs, activeTabId } = state.session;
+  const closing = new Set(ids);
+  if (!tabs.some((t) => closing.has(t.id))) return state;
+  const closed = [
+    ...(state.session.closed ?? []),
+    ...tabs.map((tab, index) => ({ tab, index })).filter(({ tab }) => closing.has(tab.id)),
+  ].slice(-MAX_CLOSED_TABS);
+  const remaining = tabs.filter((t) => !closing.has(t.id));
+  if (!remaining.length) {
+    const tab = newTab();
+    return { ...state, session: { tabs: [tab], activeTabId: tab.id, closed } };
+  }
+  let nextActive = keepActive ?? activeTabId;
+  if (!remaining.some((t) => t.id === nextActive)) {
+    const index = tabs.findIndex((t) => t.id === activeTabId);
+    nextActive = remaining[Math.min(index, remaining.length - 1)].id;
+  }
+  return { ...state, session: { tabs: remaining, activeTabId: nextActive, closed } };
+}
+
 export function reducer(state, action) {
   switch (action.type) {
     // ---- Categories -------------------------------------------------------
@@ -203,6 +256,8 @@ export function reducer(state, action) {
         id: action.id ?? newId(),
         name: action.name.trim(),
         color: action.color ?? CATEGORY_COLORS[state.categories.length % CATEGORY_COLORS.length],
+        icon: action.icon ?? '',
+        description: '',
       };
       return { ...state, categories: [...state.categories, category] };
     }
@@ -211,7 +266,13 @@ export function reducer(state, action) {
         ...state,
         categories: state.categories.map((c) =>
           c.id === action.id
-            ? { ...c, ...(action.name !== undefined && { name: action.name.trim() }), ...(action.color && { color: action.color }) }
+            ? {
+                ...c,
+                ...(action.name !== undefined && { name: action.name.trim() }),
+                ...(HEX_COLOR.test(action.color ?? '') && { color: action.color }),
+                ...(action.icon !== undefined && { icon: action.icon.slice(0, 8) }),
+                ...(action.description !== undefined && { description: action.description }),
+              }
             : c,
         ),
       };
@@ -261,6 +322,14 @@ export function reducer(state, action) {
       }));
       return { ...next, plans: [...next.plans, single] };
     }
+    case 'plans/moveToDate': {
+      // Moves several one-off plans to a new date at once (e.g. unfinished plans to today).
+      const ids = new Set(action.ids);
+      return {
+        ...state,
+        plans: state.plans.map((p) => (ids.has(p.id) && !p.repeat ? applyPlanChanges(p, { date: action.date }) : p)),
+      };
+    }
     case 'plan/setDone':
       return updatePlan(state, action.id, (p) => ({
         ...p,
@@ -300,36 +369,70 @@ export function reducer(state, action) {
     case 'settings/update':
       return { ...state, settings: { ...state.settings, ...action.changes } };
 
+    // ---- Import -----------------------------------------------------------
+    case 'data/replace': {
+      // Loads a backup. The open tabs stay as they are.
+      const data = normalizeData(action.data);
+      return { ...data, session: state.session };
+    }
+
     // ---- Tabs and navigation ----------------------------------------------
     case 'tab/open': {
       const tab = newTab(action.path);
       const tabs = [...state.session.tabs];
-      tabs.splice(tabs.findIndex((t) => t.id === state.session.activeTabId) + 1, 0, tab);
+      const after = action.afterId ?? state.session.activeTabId;
+      tabs.splice(tabs.findIndex((t) => t.id === after) + 1, 0, tab);
       return {
         ...state,
-        session: { tabs, activeTabId: action.background ? state.session.activeTabId : tab.id },
+        session: { ...state.session, tabs: pinnedFirst(tabs), activeTabId: action.background ? state.session.activeTabId : tab.id },
       };
     }
-    case 'tab/close': {
-      const { tabs, activeTabId } = state.session;
-      const index = tabs.findIndex((t) => t.id === action.id);
-      if (index === -1) return state;
-      const remaining = tabs.filter((t) => t.id !== action.id);
-      if (!remaining.length) {
-        const tab = newTab();
-        return { ...state, session: { tabs: [tab], activeTabId: tab.id } };
-      }
-      const nextActive = activeTabId === action.id ? remaining[Math.min(index, remaining.length - 1)].id : activeTabId;
-      return { ...state, session: { tabs: remaining, activeTabId: nextActive } };
+    case 'tab/duplicate': {
+      const source = state.session.tabs.find((t) => t.id === action.id);
+      if (!source) return state;
+      const tab = { id: newId(), history: [...source.history], index: source.index };
+      const tabs = [...state.session.tabs];
+      tabs.splice(tabs.indexOf(source) + 1, 0, tab);
+      return { ...state, session: { ...state.session, tabs: pinnedFirst(tabs), activeTabId: tab.id } };
     }
+    case 'tab/close':
+      return closeTabs(state, [action.id]);
+    case 'tab/closeOthers':
+      return closeTabs(state, state.session.tabs.filter((t) => t.id !== action.id && !t.pinned).map((t) => t.id), action.id);
+    case 'tab/closeRight': {
+      const index = state.session.tabs.findIndex((t) => t.id === action.id);
+      return closeTabs(state, state.session.tabs.slice(index + 1).map((t) => t.id), action.id);
+    }
+    case 'tab/reopen': {
+      const closed = [...(state.session.closed ?? [])];
+      const last = closed.pop();
+      if (!last) return state;
+      const tabs = [...state.session.tabs];
+      tabs.splice(Math.min(last.index, tabs.length), 0, last.tab);
+      return { ...state, session: { ...state.session, tabs: pinnedFirst(tabs), activeTabId: last.tab.id, closed } };
+    }
+    case 'tab/pin':
+      return {
+        ...state,
+        session: {
+          ...state.session,
+          tabs: pinnedFirst(
+            state.session.tabs.map((t) => {
+              if (t.id !== action.id) return t;
+              const { pinned: _old, ...rest } = t;
+              return action.pinned ? { ...rest, pinned: true } : rest;
+            }),
+          ),
+        },
+      };
     case 'tab/move': {
-      // Moves a tab so it ends up at position `toIndex`.
+      // Moves a tab so it ends up at position `toIndex` (pinned tabs stay on the left).
       const tabs = [...state.session.tabs];
       const from = tabs.findIndex((t) => t.id === action.id);
       if (from === -1) return state;
       const [tab] = tabs.splice(from, 1);
       tabs.splice(Math.max(0, Math.min(action.toIndex, tabs.length)), 0, tab);
-      return { ...state, session: { ...state.session, tabs } };
+      return { ...state, session: { ...state.session, tabs: pinnedFirst(tabs) } };
     }
     case 'tab/activate':
       return state.session.tabs.some((t) => t.id === action.id)

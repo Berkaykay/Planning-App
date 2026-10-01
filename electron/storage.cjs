@@ -5,10 +5,12 @@ const fs = require('fs');
 const path = require('path');
 
 const FILE_NAME = 'planner-data.json';
+const KEEP_BACKUPS = 7;
 
 function createStorage(dir) {
   const file = path.join(dir, FILE_NAME);
   const tmp = `${file}.tmp`;
+  const backupsDir = path.join(dir, 'backups');
 
   function load() {
     fs.mkdirSync(dir, { recursive: true });
@@ -31,7 +33,26 @@ function createStorage(dir) {
     fs.renameSync(tmp, file);
   }
 
-  return { file, load, save };
+  // Keeps one copy of the data file per day for the last week (made when the app starts).
+  function backupDaily(today = new Date().toISOString().slice(0, 10)) {
+    if (!fs.existsSync(file)) return;
+    fs.mkdirSync(backupsDir, { recursive: true });
+    const target = path.join(backupsDir, `planner-data-${today}.json`);
+    if (!fs.existsSync(target)) fs.copyFileSync(file, target);
+    const old = listBackups().slice(KEEP_BACKUPS);
+    for (const name of old) fs.rmSync(path.join(backupsDir, name), { force: true });
+  }
+
+  function listBackups() {
+    if (!fs.existsSync(backupsDir)) return [];
+    return fs
+      .readdirSync(backupsDir)
+      .filter((n) => /^planner-data-\d{4}-\d{2}-\d{2}\.json$/.test(n))
+      .sort()
+      .reverse();
+  }
+
+  return { file, dir, backupsDir, load, save, backupDaily, listBackups };
 }
 
 module.exports = { createStorage };

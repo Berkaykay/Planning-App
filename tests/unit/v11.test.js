@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reducer, createInitialData, normalizeData, normalizePlan } from '../../src/lib/store.js';
+import { reducer, createInitialData, normalizeData, normalizePlan, DATA_VERSION } from '../../src/lib/store.js';
 import { comparePlans, monthStats, plansOn } from '../../src/lib/recurrence.js';
 import { formatTimeRange, parseTime } from '../../src/lib/dates.js';
 
@@ -104,12 +104,12 @@ test('version 1 data is migrated', () => {
     categories: [{ id: 'c', name: 'Health', color: '#e5484d' }],
     plans: [{ id: 'p', title: 'Run', date: '2026-10-01', hour: 7 }],
   });
-  assert.equal(s.version, 2);
+  assert.equal(s.version, DATA_VERSION);
   assert.equal(s.categories[0].color, '#d0715b');
   assert.equal(s.plans[0].minute, 0);
   assert.equal(s.plans[0].duration, null);
   assert.deepEqual(s.timetables, []);
-  assert.deepEqual(s.settings, { theme: 'system' });
+  assert.deepEqual(s.settings, { theme: 'system', reminders: { enabled: true, minutes: 10, lessons: false } });
   assert.equal(normalizeData({ settings: { theme: 'dark' } }).settings.theme, 'dark');
   assert.equal(normalizeData({ settings: { theme: 'neon' } }).settings.theme, 'system');
 });

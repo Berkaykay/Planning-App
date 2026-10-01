@@ -9,7 +9,7 @@
 // Completion is stored per occurrence in `doneDates`, so each day of a repeating
 // plan starts unchecked and past check marks stay as history.
 
-import { addDays, daysInMonth, fromKey, pad, weekday, WEEKDAY_NAMES, WEEKDAY_ORDER, formatShort } from './dates.js';
+import { addDays, daysInMonth, fromKey, pad, weekday, weekStart, WEEKDAY_NAMES, WEEKDAY_ORDER, formatShort } from './dates.js';
 
 export const FREQUENCIES = ['daily', 'weekly', 'monthly'];
 
@@ -47,12 +47,18 @@ export function comparePlans(a, b) {
   return a.title.localeCompare(b.title);
 }
 
+// Everything that happens on a date: plans and timetable lessons.
 export function plansOn(plans, date) {
   return plans.filter((p) => occursOn(p, date)).sort(comparePlans);
 }
 
+// Lessons come from the Timetable. They are shown separately and never count as plans.
+export const isLesson = (plan) => Boolean(plan.timetableId);
+export const tasksOn = (plans, date) => plansOn(plans, date).filter((p) => !isLesson(p));
+export const lessonsOn = (plans, date) => plansOn(plans, date).filter(isLesson);
+
 export function dayProgress(plans, date) {
-  const list = plansOn(plans, date);
+  const list = tasksOn(plans, date);
   return { total: list.length, done: list.filter((p) => isDone(p, date)).length };
 }
 
@@ -92,7 +98,7 @@ export function monthStats(plans, days, month, today) {
   let run = 0;
   for (let d = 1; d <= daysInMonth(y, m - 1); d++) {
     const date = `${month}-${pad(d)}`;
-    const list = plansOn(plans, date);
+    const list = tasksOn(plans, date);
     if (list.length > stats.busiestCount) {
       stats.busiest = date;
       stats.busiestCount = list.length;
@@ -109,4 +115,61 @@ export function monthStats(plans, days, month, today) {
     } else run = 0;
   }
   return stats;
+}
+
+// Past days, newest first, starting the day before `before`. Each entry lists the plans that
+// were done and missed that day. Days without plans are skipped unless the day was completed.
+export function historyDays(plans, days, before, count) {
+  const tasks = plans.filter((p) => !isLesson(p));
+  const earliest = tasks.reduce((min, p) => (p.date < min ? p.date : min), before);
+  const out = [];
+  let date = addDays(before, -1);
+  while (out.length < count && date >= earliest) {
+    const list = tasksOn(tasks, date);
+    if (list.length || days[date]?.done) {
+      out.push({
+        date,
+        done: list.filter((p) => isDone(p, date)),
+        missed: list.filter((p) => !isDone(p, date)),
+        dayDone: Boolean(days[date]?.done),
+      });
+    }
+    date = addDays(date, -1);
+  }
+  return { entries: out, next: date >= earliest ? addDays(date, 1) : null };
+}
+
+// One-off plans from the last `withinDays` days that were never completed.
+export function unfinishedPlans(plans, today, withinDays = 30) {
+  const from = addDays(today, -withinDays);
+  return plans
+    .filter((p) => !p.repeat && !isLesson(p) && p.date < today && p.date >= from && !isDone(p, p.date))
+    .sort((a, b) => (a.date === b.date ? comparePlans(a, b) : a.date < b.date ? 1 : -1));
+}
+
+// Activity of one category over the last four weeks (Monday-based), counting plan occurrences.
+export function categoryStats(plans, categoryId, today) {
+  const tasks = plans.filter((p) => p.categoryId === categoryId && !isLesson(p));
+  const firstWeek = addDays(weekStart(today), -21);
+  const weeks = [0, 1, 2, 3].map((i) => ({ start: addDays(firstWeek, i * 7), done: 0, total: 0 }));
+  for (let i = 0; i < 28; i++) {
+    const date = addDays(firstWeek, i);
+    if (date > today) break;
+    for (const p of tasks) {
+      if (!occursOn(p, date)) continue;
+      weeks[Math.floor(i / 7)].total++;
+      if (isDone(p, date)) weeks[Math.floor(i / 7)].done++;
+    }
+  }
+  const done = weeks.reduce((n, w) => n + w.done, 0);
+  const total = weeks.reduce((n, w) => n + w.total, 0);
+  return {
+    weeks,
+    done,
+    total,
+    rate: total ? Math.round((done / total) * 100) : null,
+    thisWeek: weeks[3],
+    upcoming: tasks.filter((p) => !p.repeat && p.date >= today && !isDone(p, p.date)).length,
+    repeating: tasks.filter((p) => p.repeat).length,
+  };
 }

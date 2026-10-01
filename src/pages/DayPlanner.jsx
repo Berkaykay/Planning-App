@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context.js';
-import { plansOn, isDone } from '../lib/recurrence.js';
+import { tasksOn, isDone } from '../lib/recurrence.js';
 import { addDays, formatHour, formatLong, isDateKey, relativeDayLabel } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import { newId } from '../lib/store.js';
 import PlanItem, { PLAN_DRAG_TYPE } from '../components/PlanItem.jsx';
 import Check from '../components/Check.jsx';
 import Link from '../components/Link.jsx';
+import LessonStrip from '../components/LessonStrip.jsx';
 import { usePlanActions } from '../components/planActions.jsx';
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -15,7 +16,8 @@ export default function DayPlanner({ date }) {
   const { state, dispatch, navigate, today } = useApp();
   const actions = usePlanActions();
   const gridRef = useRef(null);
-  const plans = plansOn(state.plans, date);
+  // Lessons are listed separately (LessonStrip) and don't count as plans.
+  const plans = tasksOn(state.plans, date);
   const allDay = plans.filter((p) => p.hour === null);
   const doneCount = plans.filter((p) => isDone(p, date)).length;
   const dayDone = Boolean(state.days[date]?.done);
@@ -75,6 +77,8 @@ export default function DayPlanner({ date }) {
         </div>
         <Progress done={doneCount} total={plans.length} />
       </header>
+
+      <LessonStrip date={date} />
 
       <section className="all-day">
         <DropZone onDropPlan={dropTo(null)} className="all-day-zone" testId="all-day-zone">

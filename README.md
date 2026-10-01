@@ -23,7 +23,7 @@ Built with **Electron + React** (bundled by Vite). All data is saved locally in 
    - **macOS:** open the `.dmg` and drag **Planner** into **Applications**. The first time you open it, macOS will say it can't verify the developer. Click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway**. If macOS says the app *"is damaged"*, run `xattr -cr /Applications/Planner.app` in Terminal and open it again.
    - **Linux:** make the file executable (`chmod +x Planner-*.AppImage`) and run it. On Ubuntu 22.04 and newer, if it doesn't start, install FUSE (`sudo apt install libfuse2t64`, or `libfuse2` on 22.04) or start it with `--no-sandbox`.
 
-Your plans are kept when you update: installing a newer version replaces the app but not your data (see [Where your data is stored](#where-your-data-is-stored)).
+**Updating is automatic for your data:** your plans are stored separately from the app, so a new version picks them up as they are. Just replace the old file (or run the new installer). See [Where your data is stored](#where-your-data-is-stored).
 
 ### Run from source (for developers)
 
@@ -43,7 +43,9 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 ## Features
 
 **Browser-style navigation**
-- Tabs: `+` or **Ctrl+T** opens a tab, **Ctrl+W** or middle-click closes one, and **Ctrl+Tab** / **Ctrl+Shift+Tab** switches between them. Drag a tab to change the order.
+- Tabs: `+` or **Ctrl+T** opens a tab, **Ctrl+W** or middle-click closes one, **Ctrl+Shift+T** reopens the last closed tab, and **Ctrl+Tab** / **Ctrl+Shift+Tab** switches between them.
+- Drag a tab along the tab strip to reorder it; the other tabs slide out of the way.
+- Right-click a tab for more options: *New tab to the right*, *Duplicate*, *Pin* (pinned tabs shrink to an icon and stay on the left), *Close other tabs*, *Close tabs to the right* and *Reopen closed tab*.
 - Each tab has its own back/forward history. Use the ← → buttons, **Alt+←/→** (on macOS **Cmd+[ / ]**), or the mouse side buttons.
 - The address bar shows the page you're on, such as `planner://day/2026-10-01`, and you can type an address to go there. Addresses: `planner://dashboard`, `planner://calendar/2026-10`, `planner://day/today`, `planner://timetable`, `planner://categories`.
 - **Ctrl+click** or middle-click any link or calendar day to open it in a background tab.
@@ -51,18 +53,23 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 - Your open tabs, their order and their history are restored when you reopen the app.
 
 **Pages**
-- **Dashboard**: today's plans and progress, the next 7 days, a 14-day history for each repeating plan, and categories.
-- **Calendar**: a compact month grid. Each day shows one dot per plan (in its category color) and a done/total count. Click a day to see it in the panel beside the calendar, where you can check off plans, add plans and complete the whole day without leaving the page. Double-click a day to open it in the Day Planner. A **This month** panel shows days completed, the share of plans done, your longest streak of completed days and your busiest day.
+- **Dashboard**: today's plans and lessons, the next 7 days, *Unfinished* plans from recent days (with **Move to today**), a two-week history for each routine, and your categories as tiles.
+- **Calendar**: a month grid that grows with the window. Each day shows one dot per plan (in its category color) and a done/total count, and completed days get a green stamp. Click a day to see it in the panel beside the calendar, split into *To do* and *Completed*. From there you can check off plans, add plans and complete the whole day without leaving the page. Double-click a day to open it in the Day Planner. A **This month** bar along the bottom shows days completed, the share of plans done, your longest streak of completed days and your busiest day.
 - **Day Planner**: an *All day* section plus 24 hourly slots. Click a slot (or **+ New plan**) to schedule something at that hour. Drag plans between hours or into *All day* to move them.
 - **Timetable**: your weekly school (or work) schedule, set up once. See [Timetable](#timetable) below.
-- **Categories**: create, rename, recolor and delete categories, each with its own page listing its plans.
+- **History**: a compact record of your past days. Each day is one line (✓ done · ✗ missed); click it to see exactly which plans were done and which weren't. Filter to days with missed plans or days where everything was done, and load older days as needed.
+- **Settings**: theme, reminders, backups and where your data is stored.
+- **Categories**: create, rename, recolor and delete categories. Each category has its own page with:
+  - an icon (emoji), a description and any color, set under **Customize**;
+  - stats: % done over the last 4 weeks, this week's progress, upcoming and repeating plans, and a 4-week chart;
+  - tabs for *Upcoming*, *Done*, *Missed*, *Repeating* and *Lessons*, with search and sorting.
 
 **Categories sidebar**: create (`+`), rename (✎ or double-click), delete (🗑), and select (click) categories. Assign a plan to a category in the plan dialog, or drag a plan onto a category in the sidebar. Deleting a category keeps its plans; they just have no category any more.
 
 **Plans**: each plan has a title, date, a start and optional end time such as 08:30–09:10 (or *All day*), a category, notes and an optional repeat. Edit with ✎ (or double-click), delete with 🗑, and move by dragging or by changing the date and time in the edit dialog.
 
 **Check marks**
-- Each plan has a round check button. A completed plan is crossed out, and clicking again undoes it.
+- Each plan has a round check button. Checking it presses in a green stamp, and the plan is crossed out. Clicking again undoes it.
 - Each whole day also has its own check button: the big circle next to the date in the Day Planner, on the Dashboard's *Today* card, or in the Calendar's day panel. A completed day's heading is crossed out and highlighted. The day check is independent of the plans in that day.
 
 **Repeating plans**: set *Repeat* to Daily, Weekly (on chosen weekdays) or Monthly (same date; a plan on the 31st falls on the last day of shorter months), with an optional end date.
@@ -78,9 +85,13 @@ For school lessons (or any fixed weekly schedule), open **Timetable** in the sid
 2. Type each subject into the **Mon–Fri grid**. Press **Enter** to jump to the cell below, and subjects you've typed before are suggested. The ⧉ button next to a day copies the previous day's lessons. Tick **Include Saturday** if you have Saturday lessons.
 3. Optionally set when the term **ends**, then click **Save timetable**.
 
-Each filled cell becomes a weekly repeating plan in the *School* category, created automatically. It shows up in the Day Planner, Calendar and Dashboard with its time, such as 08:30–09:10, and gets a fresh check mark every week. You can come back and change the timetable at any time: saving again updates your lessons but keeps the check marks you already made. **Delete timetable** removes all its lessons.
+Each filled cell becomes a weekly lesson in the *School* category, created automatically. Lessons aren't counted as plans: they appear in their own **Lessons** strip on the Day Planner, Dashboard and Calendar, with their times (such as 08:30–09:10). Tick a lesson to mark that you attended; this doesn't change your plan progress. You can come back and change the timetable at any time: saving again updates your lessons but keeps the check marks you already made. **Delete timetable** removes all its lessons.
 
 **Theme**: the switch at the bottom of the sidebar chooses **Light**, **Dark** or **System** (follows your computer's setting).
+
+**Undo**: **Ctrl+Z** undoes the last change to your plans, such as completing, deleting, moving or importing, and **Ctrl+Shift+Z** (or **Ctrl+Y**) redoes it. A small message with an **Undo** button also appears after those actions.
+
+**Reminders**: Planner shows a desktop notification 10 minutes before a timed plan starts, while the app is open. In **Settings** you can turn reminders off, change the timing, or include lessons.
 
 ## Where your data is stored
 
@@ -92,7 +103,13 @@ Everything is saved immediately after each change to `planner-data.json` in the 
 | macOS   | `~/Library/Application Support/Planner/planner-data.json` |
 | Linux   | `~/.config/Planner/planner-data.json`           |
 
-Writes are atomic: the app writes a temporary file and renames it, so a crash can't corrupt the file. To use a different folder, set the `PLANNER_DATA_DIR` environment variable. To back up your plans, copy that file.
+- **Updates keep your data:** the file lives outside the app, so new versions simply keep using it.
+- **Daily backups:** each day the app starts, it saves a copy in the `backups` folder next to the data file and keeps the last 7 days.
+- **Export/Import:** **Settings → Export backup…** saves everything to a file of your choice; **Import backup…** loads one back (and can be undone with Ctrl+Z).
+- **Safe with older versions:** if an older version of Planner opens data saved by a newer one, it shows it but doesn't overwrite it.
+- **Crash-safe writes:** the app writes a temporary file and then renames it, so a crash can't corrupt your data.
+
+To use a different folder, set the `PLANNER_DATA_DIR` environment variable.
 
 ## Tests
 
@@ -109,8 +126,10 @@ The end-to-end tests launch the actual app with a temporary data folder and cove
 - the Timetable: entering lessons, weekly repeats, editing without losing check marks, and deleting;
 - the Calendar's day panel and month stats;
 - the **+ New plan** button on every page;
+- lessons kept apart from plans, the History page, unfinished plans, category customization, filters and stats;
+- undo/redo, reminders, backup export/import, daily backups and the newer-version guard;
 - repeating plans: a fresh check mark each day, history, and one-day edits and deletes;
-- tabs (including drag-to-reorder), back/forward, the address bar and keyboard shortcuts;
+- tabs (dragging, pinning, the right-click menu, reopening closed tabs), back/forward, the address bar and keyboard shortcuts;
 - persistence across closing and reopening the app, including the theme and tab order.
 
 On a Linux machine without a display (for example CI), run them under a virtual display: `xvfb-run -a npm run test:e2e`.
@@ -119,13 +138,15 @@ On a Linux machine without a display (for example CI), run them under a virtual 
 
 ```
 electron/        main process: window, menu/shortcuts, JSON storage (storage.cjs), preload bridge
-src/lib/         pure logic: dates, recurrence rules, routes, state reducer
+src/lib/         pure logic: dates, recurrence rules, routes, state reducer, undo history
 src/components/  tabs, nav bar, sidebar, plan item, dialogs, shared plan/category actions
-src/pages/       Dashboard, Calendar, DayPlanner, Timetable, Categories, CategoryPage, NotFound
+src/pages/       Dashboard, Calendar, DayPlanner, Timetable, History, Categories, CategoryPage, Settings, NotFound
 tests/unit/      node:test unit tests
 tests/e2e/       Playwright tests against the Electron app
 ```
 
 ![Calendar](docs/calendar.png)
-![Timetable](docs/timetable.png)
 ![Day Planner](docs/day-planner.png)
+![Category page](docs/category.png)
+![History](docs/history.png)
+![Timetable](docs/timetable.png)
