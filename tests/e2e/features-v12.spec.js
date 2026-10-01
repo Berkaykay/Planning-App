@@ -197,7 +197,9 @@ test('tabs: pin, close others, reopen closed tab, smooth dragging stays in the s
   const month = await tabs.nth(1).locator('.tab-title').innerText();
   expect(await tabTitles()).toEqual(['Dashboard', month, 'History']);
 
-  // Dragging far below the strip still keeps the tab in line.
+  // Dragging far below the strip still keeps the tab in line. (Wait for the new-tab
+  // animation to finish first, so the measured positions are the final ones.)
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
   const b0 = await tabs.nth(0).boundingBox();
   const b2 = await tabs.nth(2).boundingBox();
   await page.mouse.move(b2.x + b2.width / 2, b2.y + b2.height / 2);
