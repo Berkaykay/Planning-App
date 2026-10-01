@@ -1,7 +1,24 @@
 import React from 'react';
 import { useApp } from '../context.js';
-import { tasksOn, isDone, dayProgress, isLesson, unfinishedPlans, categoryStats, lessonsOn } from '../lib/recurrence.js';
-import { addDays, formatLong, relativeDayLabel } from '../lib/dates.js';
+import {
+  tasksOn,
+  isDone,
+  dayProgress,
+  isLesson,
+  unfinishedPlans,
+  categoryStats,
+  lessonsOn,
+  openDeadlines,
+  currentStreak,
+  rangeStats,
+  upNext,
+  deadlinesDueOn,
+} from '../lib/recurrence.js';
+import { addDays, formatLong, formatTime, formatTimeRange, formatWeekday, fromKey, relativeDayLabel, weekStart } from '../lib/dates.js';
+import { DeadlineItem, useDeadlineActions } from '../components/deadlineActions.jsx';
+import { useNow } from '../components/LessonStrip.jsx';
+import { DayStamp } from '../components/Check.jsx';
+import { FlagIcon } from '../components/Icons.jsx';
 import { paths } from '../lib/routes.js';
 import { newId } from '../lib/store.js';
 import PlanItem from '../components/PlanItem.jsx';
@@ -37,6 +54,8 @@ export default function Dashboard() {
         <div className="subtle">{formatLong(today)}</div>
       </header>
 
+      <WeekStrip />
+
       <div className="cards">
         <section className={`card today-card ${dayDone ? 'day-done' : ''}`}>
           <div className="card-head">
@@ -64,6 +83,8 @@ export default function Dashboard() {
         </section>
 
         <div className="dashboard-side">
+          <UpNext />
+          <Deadlines />
           <Unfinished />
 
           <section className="card">
@@ -98,6 +119,8 @@ export default function Dashboard() {
             </ul>
           </section>
         </div>
+
+        <Stats />
 
         {routines.length > 0 && (
           <section className="card wide">
@@ -184,6 +207,148 @@ function Unfinished() {
           See all in History →
         </Link>
       )}
+    </section>
+  );
+}
+
+// Mon-Sun of the current week: progress per day, stamps on completed days, deadline flags.
+function WeekStrip() {
+  const { state, today, navigate } = useApp();
+  const start = weekStart(today);
+  return (
+    <section className="week-strip" aria-label="This week" data-testid="week-strip">
+      {Array.from({ length: 7 }, (_, i) => addDays(start, i)).map((date) => {
+        const { total, done } = dayProgress(state.plans, date);
+        const dayDone = Boolean(state.days[date]?.done);
+        const flags = deadlinesDueOn(state.deadlines, date).filter((d) => !d.done).length;
+        return (
+          <button
+            key={date}
+            className={`strip-day ${date === today ? 'today' : ''} ${date < today ? 'past' : ''} ${dayDone ? 'day-done' : ''}`}
+            onClick={(e) => navigate(paths.day(date), { newTab: e.ctrlKey || e.metaKey })}
+            title={`Open ${formatLong(date)}`}
+          >
+            <span className="strip-weekday">{formatWeekday(date)}</span>
+            <span className="strip-date">{fromKey(date).getDate()}</span>
+            <span className="strip-progress">
+              <span style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+            </span>
+            <span className="strip-count">
+              {total ? `${done}/${total}` : '–'}
+              {flags > 0 && (
+                <span className="strip-flag" title={`${flags} deadline${flags === 1 ? '' : 's'}`}>
+                  <FlagIcon size={11} />
+                </span>
+              )}
+            </span>
+            {dayDone && <DayStamp />}
+          </button>
+        );
+      })}
+    </section>
+  );
+}
+
+// What's next today: the next lesson and the next timed plan, with a countdown.
+function UpNext() {
+  const { state, today } = useApp();
+  const now = useNow();
+  const { lesson, plan, minutes } = upNext(state.plans, today, now);
+  if (!lesson && !plan) return null;
+  const inText = (p) => {
+    const diff = p.hour * 60 + p.minute - minutes;
+    if (diff < 60) return `in ${diff} min`;
+    return `at ${formatTime(p.hour, p.minute)}`;
+  };
+  return (
+    <section className="card up-next" data-testid="up-next">
+      <h2>Up next</h2>
+      {lesson && (
+        <div className="up-next-row">
+          <span className="up-next-kind">Lesson</span>
+          <span className="up-next-title">{lesson.title}</span>
+          <span className="up-next-when">{inText(lesson)}</span>
+          <span className="subtle">{formatTimeRange(lesson)}</span>
+        </div>
+      )}
+      {plan && (
+        <div className="up-next-row">
+          <span className="up-next-kind plan">Plan</span>
+          <span className="up-next-title">{plan.title}</span>
+          <span className="up-next-when">{inText(plan)}</span>
+          <span className="subtle">{formatTimeRange(plan)}</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Deadlines() {
+  const { state, today } = useApp();
+  const actions = useDeadlineActions();
+  const list = openDeadlines(state.deadlines, today, today);
+  return (
+    <section className="card deadlines-card" data-testid="deadlines">
+      <div className="card-head">
+        <h2>Deadlines</h2>
+        <span className="subtle">{list.length ? `${list.length} open` : ''}</span>
+        <button className="small-button card-link" onClick={() => actions.create({ due: addDays(today, 7) })}>
+          + Add deadline
+        </button>
+      </div>
+      {list.length === 0 ? (
+        <p className="empty">No deadlines. Add one here, or right-click a day in the calendar.</p>
+      ) : (
+        <div className="plan-list">
+          {list.map((d) => (
+            <DeadlineItem key={d.id} deadline={d} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Stats() {
+  const { state, today } = useApp();
+  const now = useNow();
+  const week = rangeStats(state.plans, weekStart(today), addDays(weekStart(today), 6), today, now);
+  const month = rangeStats(state.plans, `${today.slice(0, 7)}-01`, today, today, now);
+  const streak = currentStreak(state.days, today);
+  const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '–');
+  return (
+    <section className="card wide stats-card" data-testid="stats">
+      <h2>Your progress</h2>
+      <div className="stat-tiles">
+        <div className="stat">
+          <span className="stat-value">
+            {streak}
+            <small> day{streak === 1 ? '' : 's'}</small>
+          </span>
+          <span className="stat-label">streak of completed days</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">
+            {week.done}
+            <small>/{week.total}</small>
+          </span>
+          <span className="stat-label">plans done this week · {pct(week.done, week.total)}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">
+            {month.done}
+            <small>/{month.total}</small>
+          </span>
+          <span className="stat-label">plans done this month · {pct(month.done, month.total)}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">
+            {week.lessons}
+            <small>/{week.lessonsTotal}</small>
+          </span>
+          <span className="stat-label">lessons attended this week</span>
+        </div>
+      </div>
     </section>
   );
 }

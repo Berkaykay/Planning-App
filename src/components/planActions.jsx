@@ -53,7 +53,7 @@ export function usePlanActions() {
 
     // Moves a plan's occurrence on `date` to another date and/or hour (hour null = all day).
     async move(plan, date, to) {
-      if (to.date === date && to.hour === plan.hour) return;
+      if (to.date === date && to.hour === plan.hour && (to.minute ?? plan.minute) === plan.minute) return;
       // Moving between hour rows keeps the minutes; moving to "All day" drops the time.
       if (to.hour === null) Object.assign(to, { minute: 0, duration: null });
       if (!plan.repeat) {

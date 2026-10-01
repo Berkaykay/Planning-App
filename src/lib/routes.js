@@ -15,7 +15,9 @@ export function parseRoute(path) {
       return param === undefined ? { page: 'dashboard' } : { page: 'notfound', path: clean };
     case 'calendar':
       if (param === undefined) return { page: 'calendar', month: monthOf(todayKey()) };
-      return isMonthKey(param) ? { page: 'calendar', month: param } : { page: 'notfound', path: clean };
+      if (isMonthKey(param)) return { page: 'calendar', month: param };
+      // calendar/2026-10-01 opens October with that day selected.
+      return isDateKey(param) ? { page: 'calendar', month: monthOf(param), date: param } : { page: 'notfound', path: clean };
     case 'day':
       if (param === undefined || param === 'today') return { page: 'day', date: todayKey() };
       return isDateKey(param) ? { page: 'day', date: param } : { page: 'notfound', path: clean };

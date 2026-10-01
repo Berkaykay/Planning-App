@@ -7,6 +7,7 @@ import Check from './Check.jsx';
 import Link from './Link.jsx';
 import { usePlanActions } from './planActions.jsx';
 import { useDrag } from './dragDrop.jsx';
+import { EditIcon, TrashIcon } from './Icons.jsx';
 
 // One occurrence of a plan (on `date`) with its check mark, details, checklist and edit/delete
 // buttons. Drag it to move it; right-click it for more options.
@@ -80,11 +81,11 @@ export default function PlanItem({ plan, date, showTime = true, showDate = false
         )}
       </div>
       <div className="plan-actions">
-        <button className="icon-button" aria-label={`Edit "${plan.title}"`} title="Edit" onClick={() => actions.edit(plan, date)}>
-          ✎
+        <button className="icon-button action-icon" aria-label={`Edit "${plan.title}"`} title="Edit" onClick={() => actions.edit(plan, date)}>
+          <EditIcon />
         </button>
-        <button className="icon-button" aria-label={`Delete "${plan.title}"`} title="Delete" onClick={() => actions.remove(plan, date)}>
-          🗑
+        <button className="icon-button action-icon danger-icon" aria-label={`Delete "${plan.title}"`} title="Delete" onClick={() => actions.remove(plan, date)}>
+          <TrashIcon />
         </button>
       </div>
     </div>

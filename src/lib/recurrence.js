@@ -9,7 +9,7 @@
 // Completion is stored per occurrence in `doneDates`, so each day of a repeating
 // plan starts unchecked and past check marks stay as history.
 
-import { addDays, daysInMonth, fromKey, pad, toKey, weekday, weekStart, WEEKDAY_NAMES, WEEKDAY_ORDER, formatShort } from './dates.js';
+import { addDays, daysInMonth, fromKey, pad, toKey, weekday, weekStart, WEEKDAY_NAMES, WEEKDAY_ORDER, formatShort, formatMedium } from './dates.js';
 
 export const FREQUENCIES = ['daily', 'weekly', 'monthly'];
 
@@ -235,4 +235,70 @@ export function weekLayout(plans, start) {
     return { date, allDay: list.filter((p) => p.hour === null), blocks };
   });
   return { days, fromHour, toHour: Math.min(24, toHour) };
+}
+
+// ---- Deadlines ---------------------------------------------------------------
+
+// Whole days from `today` to `due` (negative when overdue).
+export const daysUntil = (due, today) => Math.round((fromKey(due) - fromKey(today)) / 86_400_000);
+
+// "Overdue by 2 days", "Due today", "Due tomorrow", "Due in 5 days" or "Due Fri, Oct 9".
+export function dueLabel(due, today) {
+  const n = daysUntil(due, today);
+  if (n < 0) return `Overdue by ${-n} day${n === -1 ? '' : 's'}`;
+  if (n === 0) return 'Due today';
+  if (n === 1) return 'Due tomorrow';
+  if (n <= 14) return `Due in ${n} days`;
+  return `Due ${formatMedium(due)}`;
+}
+
+const byDue = (a, b) => (a.due === b.due ? (a.hour ?? 24) * 60 + a.minute - ((b.hour ?? 24) * 60 + b.minute) : a.due < b.due ? -1 : 1);
+
+export const deadlinesDueOn = (deadlines, date) => deadlines.filter((d) => d.due === date).sort(byDue);
+
+// Unfinished deadlines still ahead on `date` (due that day or later), plus overdue ones when
+// `date` is today. Soonest first.
+export function openDeadlines(deadlines, date, today) {
+  return deadlines.filter((d) => !d.done && (d.due >= date || (date === today && d.due < today))).sort(byDue);
+}
+
+// ---- Dashboard stats -----------------------------------------------------------
+
+// Completed days in a row, ending today (or yesterday, if today isn't completed yet).
+export function currentStreak(days, today) {
+  let date = days[today]?.done ? today : addDays(today, -1);
+  let n = 0;
+  while (days[date]?.done) {
+    n++;
+    date = addDays(date, -1);
+  }
+  return n;
+}
+
+// Plans done / total from `from` to `to` (inclusive, capped at today), plus lessons attended.
+export function rangeStats(plans, from, to, today, now = new Date()) {
+  const s = { done: 0, total: 0, lessons: 0, lessonsTotal: 0 };
+  for (let date = from; date <= to && date <= today; date = addDays(date, 1)) {
+    for (const p of plansOn(plans, date)) {
+      if (isLesson(p)) {
+        s.lessonsTotal++;
+        if (lessonAttended(p, date, now)) s.lessons++;
+      } else {
+        s.total++;
+        if (isDone(p, date)) s.done++;
+      }
+    }
+  }
+  return s;
+}
+
+// The next lesson and the next timed plan still to start today.
+export function upNext(plans, today, now = new Date()) {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const later = plansOn(plans, today).filter((p) => p.hour !== null && p.hour * 60 + p.minute > minutes);
+  return {
+    lesson: later.find((p) => isLesson(p)) ?? null,
+    plan: later.find((p) => !isLesson(p) && !isDone(p, today)) ?? null,
+    minutes,
+  };
 }

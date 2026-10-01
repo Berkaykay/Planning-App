@@ -3,7 +3,7 @@ import { AppContext } from './context.js';
 import { normalizeData, activeTab, currentPath, DATA_VERSION } from './lib/store.js';
 import { historyReducer, initHistory } from './lib/history.js';
 import { plansOn, isDone, isLesson, lessonAttended } from './lib/recurrence.js';
-import { formatTimeRange } from './lib/dates.js';
+import { addDays, formatTime, formatTimeRange } from './lib/dates.js';
 import { loadData, saveData, onAppCommand } from './lib/persistence.js';
 import { parseRoute, paths } from './lib/routes.js';
 import { todayKey } from './lib/dates.js';
@@ -58,7 +58,7 @@ function useToday() {
 }
 
 // Shows a desktop notification shortly before timed plans (and optionally lessons) start.
-function useReminders(plans, reminders) {
+function useReminders(plans, deadlines, reminders) {
   const notified = useRef(new Set());
   useEffect(() => {
     if (!reminders.enabled || typeof Notification === 'undefined') return undefined;
@@ -76,18 +76,30 @@ function useReminders(plans, reminders) {
           body: `${lead === 0 ? 'Starts now' : `Starts in ${lead} min`} · ${formatTimeRange(p)}`,
         });
       }
+      // Deadlines: once the day before, and once on the day (from 08:00 on).
+      if (now.getHours() >= 8) {
+        for (const d of deadlines) {
+          if (d.done) continue;
+          const when = d.due === date ? 'today' : d.due === addDays(date, 1) ? 'tomorrow' : null;
+          const key = `deadline:${d.id}:${date}`;
+          if (!when || notified.current.has(key)) continue;
+          notified.current.add(key);
+          new Notification(`Deadline ${when}: ${d.title}`, { body: d.hour !== null ? `Due ${when} at ${formatTime(d.hour, d.minute)}` : `Due ${when}` });
+        }
+      }
     };
     check();
     const timer = setInterval(check, 20_000);
     return () => clearInterval(timer);
-  }, [plans, reminders]);
+  }, [plans, deadlines, reminders]);
 }
 
 // Handles dropping a dragged plan on an hour, a day or a category.
 function PlanDragLayer({ children }) {
   const actions = usePlanActions();
   const onDrop = (plan, date, target) => {
-    if (target.kind === 'slot') actions.move(plan, date, { date: target.date, hour: target.hour });
+    // Day Planner rows are exact times (e.g. 03:05); week-view slots are whole hours and keep the minutes.
+    if (target.kind === 'slot') actions.move(plan, date, { date: target.date, hour: target.hour, ...(target.minute !== undefined && { minute: target.minute }) });
     else if (target.kind === 'day') actions.move(plan, date, { date: target.date, hour: plan.hour });
     else if (target.kind === 'category') actions.setCategory(plan, target.id);
   };
@@ -113,7 +125,7 @@ function Planner({ initial, readOnly }) {
     document.documentElement.dataset.theme = state.settings.theme;
   }, [state.settings.theme]);
 
-  useReminders(state.plans, state.settings.reminders);
+  useReminders(state.plans, state.deadlines, state.settings.reminders);
 
   // Save every change. Saves are processed in order by the main process.
   useEffect(() => {
@@ -237,7 +249,7 @@ function Planner({ initial, readOnly }) {
       page = <Dashboard />;
       break;
     case 'calendar':
-      page = <Calendar month={route.month} />;
+      page = <Calendar month={route.month} date={route.date} />;
       break;
     case 'day':
       page = <DayPlanner date={route.date} />;

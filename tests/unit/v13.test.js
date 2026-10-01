@@ -128,9 +128,8 @@ test('categoryAll lists every plan of a category in date order', () => {
   assert.equal(nextOccurrence(plans[2], D), '2026-10-07');
 });
 
-test('version 3 data migrates to version 4', () => {
+test('version 3 data migrates to the current version', () => {
   const s = normalizeData({ version: 3, plans: [{ id: 'p', title: 'x', date: D }] });
   assert.equal(s.version, DATA_VERSION);
-  assert.equal(DATA_VERSION, 4);
   assert.deepEqual([s.plans[0].absentDates, s.plans[0].checklist], [[], []]);
 });

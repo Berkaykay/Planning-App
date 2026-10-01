@@ -4,6 +4,7 @@ import { paths } from '../lib/routes.js';
 import { THEMES } from '../lib/store.js';
 import Link from './Link.jsx';
 import { dropAttr } from './dragDrop.jsx';
+import { EditIcon, TrashIcon } from './Icons.jsx';
 import { useCategoryActions, CategoryNameInput } from './categoryActions.jsx';
 
 export default function Sidebar() {
@@ -150,10 +151,10 @@ function CategoryRow({ category, count, selected, renaming, onRenameStart, onRen
       </Link>
       <span className="row-actions">
         <button className="icon-button" aria-label={`Rename ${category.name}`} title="Rename" onClick={onRenameStart}>
-          ✎
+          <EditIcon size={15} />
         </button>
         <button className="icon-button" aria-label={`Delete ${category.name}`} title="Delete" onClick={() => actions.remove(category)}>
-          🗑
+          <TrashIcon size={15} />
         </button>
       </span>
     </li>

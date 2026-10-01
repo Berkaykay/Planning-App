@@ -1,6 +1,8 @@
 import React from 'react';
 import { useApp } from '../context.js';
-import { isDone, lessonAttended, tasksOn, weekLayout, isLesson } from '../lib/recurrence.js';
+import { deadlinesDueOn, isDone, lessonAttended, tasksOn, weekLayout, isLesson } from '../lib/recurrence.js';
+import { FlagIcon } from '../components/Icons.jsx';
+import { useDeadlineActions } from '../components/deadlineActions.jsx';
 import { addDays, formatHour, formatShort, formatTimeRange, formatWeekday, fromKey, monthOf, weekStart } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import Link from '../components/Link.jsx';
@@ -15,6 +17,7 @@ const HOUR_HEIGHT = 56;
 export default function Week({ start }) {
   const { state, dispatch, navigate, today, menu } = useApp();
   const actions = usePlanActions();
+  const deadlineActions = useDeadlineActions();
   const startDrag = useDrag();
   const now = useNow();
   const { days, fromHour, toHour } = weekLayout(state.plans, start);
@@ -30,6 +33,7 @@ export default function Week({ start }) {
       { label: 'Open in new tab', onSelect: () => navigate(paths.day(date), { newTab: true }) },
       null,
       { label: 'Add plan…', onSelect: () => actions.create({ date }) },
+      { label: 'Add deadline…', onSelect: () => deadlineActions.create({ due: date }) },
       { label: done ? 'Mark day as not complete' : 'Mark day complete', onSelect: () => dispatch({ type: 'day/setDone', date, done: !done }) },
       null,
       { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: () => dispatch({ type: 'history/undo' }) },
@@ -60,7 +64,8 @@ export default function Week({ start }) {
           <Link to={paths.week(today)} className={`button this-month ${start === weekStart(today) ? 'current' : ''}`}>
             This week
           </Link>
-          <Link to={paths.calendar(monthOf(start))} className="button">
+          {/* Opens the month of today (when it's in this week) or of the week's Thursday, with that day selected. */}
+          <Link to={paths.calendar(today >= start && today <= end ? today : addDays(start, 3))} className="button">
             Month view
           </Link>
         </div>
@@ -84,6 +89,13 @@ export default function Week({ start }) {
                 <span className="week-date">{fromKey(date).getDate()}</span>
               </Link>
               <span className="subtle">{tasks.length ? `${done}/${tasks.length}` : ''}</span>
+              {deadlinesDueOn(state.deadlines, date)
+                .filter((d) => !d.done)
+                .map((d) => (
+                  <span key={d.id} className="cell-flag" title={`Deadline: ${d.title}`}>
+                    <FlagIcon size={13} />
+                  </span>
+                ))}
               <Check size="small" checked={dayDone} label={`Mark ${date} complete`} onChange={(v) => dispatch({ type: 'day/setDone', date, done: v })} />
             </div>
           );

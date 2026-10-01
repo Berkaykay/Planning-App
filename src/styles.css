@@ -966,14 +966,28 @@ a.link {
 
 .plan-actions {
   display: flex;
-  opacity: 0;
-  transition: opacity 0.1s;
+  gap: 2px;
+  align-items: center;
 }
 
-.plan:hover .plan-actions,
-.plan:focus-within .plan-actions,
-.plan-actions.visible {
-  opacity: 1;
+/* Edit and delete are always visible, and easy to hit. */
+.action-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--muted);
+}
+
+.action-icon:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.danger-icon:hover:not(:disabled) {
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 /* Completed items are crossed out. */
@@ -1085,9 +1099,27 @@ a.link {
   flex: 1;
   padding: 5px 8px;
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  /* Plans at the same time sit side by side and wrap when there are many. */
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
   cursor: pointer;
+}
+
+.hour-plans > .plan {
+  flex: 0 1 340px;
+  min-width: 220px;
+}
+
+.minute-row {
+  min-height: 46px;
+  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+}
+
+.minute-row .hour-label {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .hour-add {
@@ -1870,10 +1902,26 @@ a.link {
 
 /* ---------- Dashboard extras ---------- */
 
+.dashboard .cards {
+  /* Today on the left, everything else on the right (in two columns on wide screens). */
+  grid-template-columns: minmax(360px, 1fr) minmax(0, 2fr);
+}
+
+@media (max-width: 1100px) {
+  .dashboard .cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .dashboard-side {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   gap: 16px;
+  align-items: start;
+}
+
+.dashboard-side .card {
+  margin: 0;
 }
 
 .unfinished .card-head {
@@ -2721,4 +2769,278 @@ body.dragging-plan * {
   font-size: 10.5px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Deadlines ---------- */
+
+.deadline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cat);
+  border-radius: 6px;
+  padding: 6px 8px 6px 10px;
+}
+
+.deadline.compact {
+  padding: 4px 10px 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cat);
+  background: var(--surface-2);
+}
+
+.deadline-flag {
+  color: var(--accent-text);
+  display: inline-flex;
+}
+
+.deadline.overdue .deadline-flag,
+.deadline.overdue .deadline-due {
+  color: var(--danger);
+}
+
+.deadline.soon .deadline-flag,
+.deadline.soon .deadline-due {
+  color: #d4a03f;
+}
+
+.deadline.done .deadline-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.deadline-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.deadline.compact .deadline-main {
+  flex-direction: row;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.deadline-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deadline-due {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.due-soon {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.due-soon .section-label {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.due-soon-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.cell-flag {
+  color: var(--danger);
+  display: inline-flex;
+  margin-right: auto;
+  margin-left: 4px;
+}
+
+.panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.panel-footer .open-day {
+  margin: 0;
+}
+
+/* ---------- Dashboard: week strip, up next, stats ---------- */
+
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.strip-day {
+  position: relative;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.strip-day.today {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.strip-day.past:not(.day-done) {
+  opacity: 0.75;
+}
+
+.strip-day.day-done {
+  background: color-mix(in srgb, var(--success-soft) 55%, var(--surface));
+}
+
+.strip-day .day-stamp svg {
+  width: 38px;
+  height: 38px;
+  opacity: 0.55;
+}
+
+.strip-weekday {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.strip-date {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.strip-day.today .strip-date {
+  color: var(--accent-text);
+}
+
+.strip-progress {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.strip-progress span {
+  display: block;
+  height: 100%;
+  background: var(--success);
+}
+
+.strip-count {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.strip-flag {
+  color: var(--danger);
+  display: inline-flex;
+}
+
+.up-next-row {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.up-next-row:first-of-type {
+  border-top: none;
+}
+
+.up-next-row .subtle {
+  grid-column: 2 / 4;
+  font-size: 12px;
+}
+
+.up-next-kind {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--success);
+}
+
+.up-next-kind.plan {
+  color: var(--accent-text);
+}
+
+.up-next-title {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.up-next-when {
+  font-weight: 600;
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.stats-card .stat {
+  min-width: 0;
+}
+
+/* ---------- Category sections ---------- */
+
+.category-section .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.section-toggle {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.date-group + .date-group {
+  margin-top: 12px;
+}
+
+.date-group .section-label {
+  margin-bottom: 6px;
 }

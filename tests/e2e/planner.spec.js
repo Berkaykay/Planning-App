@@ -111,15 +111,18 @@ test('daily and hourly plans: add, complete, undo, edit, move and delete', async
   await dialog().getByLabel('Start time').fill('14:15');
   await dialog().getByLabel('End time').fill('15:00');
   await dialog().getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByTestId('hour-14').getByTestId('plan')).toContainText('Team sync');
-  await expect(page.getByTestId('hour-14').getByTestId('plan')).toContainText('14:15–15:00');
+  // 14:15 gets a line of its own under 14:00.
+  await expect(page.getByTestId('time-14-15').getByTestId('plan')).toContainText('Team sync');
+  await expect(page.getByTestId('time-14-15').getByTestId('plan')).toContainText('14:15–15:00');
+  await expect(page.getByTestId('hour-14').getByTestId('plan')).toHaveCount(0);
   await expect(page.getByTestId('hour-9').getByTestId('plan')).toHaveCount(0);
 
   // Drag and drop to another hour, and from the all-day section into an hour.
   await plan('Team sync').dragTo(page.getByTestId('hour-16'));
   await expect(page.getByTestId('hour-16').getByTestId('plan')).toContainText('Team sync');
-  // Dragging keeps the minutes and the length.
-  await expect(page.getByTestId('hour-16').getByTestId('plan')).toContainText('16:15–17:00');
+  // Dropping on the 16:00 line starts it at 16:00 and keeps its length; the 14:15 line goes away.
+  await expect(page.getByTestId('hour-16').getByTestId('plan')).toContainText('16:00–16:45');
+  await expect(page.getByTestId('time-14-15')).toHaveCount(0);
   await plan('Plan the week').dragTo(page.getByTestId('hour-8'));
   await expect(page.getByTestId('hour-8').getByTestId('plan')).toContainText('Plan the week');
 

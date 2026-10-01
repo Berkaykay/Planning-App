@@ -3,6 +3,7 @@ import { useApp } from '../context.js';
 import { occursOn, isDone, describeRepeat, streak } from '../lib/recurrence.js';
 import { addDays, formatMedium, formatWeekday } from '../lib/dates.js';
 import { usePlanActions } from './planActions.jsx';
+import { EditIcon, TrashIcon } from './Icons.jsx';
 
 const DAYS = 14;
 
@@ -41,11 +42,11 @@ export default function RepeatTracker({ plan, editable = false }) {
       </div>
       {editable && (
         <div className="plan-actions visible">
-          <button className="icon-button" aria-label={`Edit "${plan.title}"`} title="Edit" onClick={() => actions.edit(plan, today)}>
-            ✎
+          <button className="icon-button action-icon" aria-label={`Edit "${plan.title}"`} title="Edit" onClick={() => actions.edit(plan, today)}>
+            <EditIcon />
           </button>
-          <button className="icon-button" aria-label={`Delete "${plan.title}"`} title="Delete" onClick={() => actions.remove(plan, today)}>
-            🗑
+          <button className="icon-button action-icon danger-icon" aria-label={`Delete "${plan.title}"`} title="Delete" onClick={() => actions.remove(plan, today)}>
+            <TrashIcon />
           </button>
         </div>
       )}
