@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, Menu, nativeTheme, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const { createStorage } = require('./storage.cjs');
 
@@ -22,11 +23,23 @@ function buildMenu() {
       submenu: [
         command('New Tab', 'CmdOrCtrl+T', 'new-tab'),
         command('Close Tab', 'CmdOrCtrl+W', 'close-tab'),
+        command('Reopen Closed Tab', 'CmdOrCtrl+Shift+T', 'reopen-tab'),
         { type: 'separator' },
         isMac ? { role: 'close', accelerator: 'Cmd+Shift+W' } : { role: 'quit' },
       ],
     },
-    { role: 'editMenu' },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
     {
       label: 'Go',
       submenu: [
@@ -103,8 +116,49 @@ ipcMain.handle('store:save', (_event, data) => {
   return true;
 });
 ipcMain.handle('store:path', () => storage.file);
+ipcMain.handle('store:info', () => ({ file: storage.file, dir: storage.dir, backups: storage.listBackups() }));
+ipcMain.handle('store:openFolder', () => shell.openPath(storage.dir));
+
+// Backup export/import. PLANNER_TEST_EXPORT_PATH / PLANNER_TEST_IMPORT_PATH skip the file
+// dialogs so the automated tests can exercise these features.
+ipcMain.handle('data:export', async (_event, data) => {
+  let target = process.env.PLANNER_TEST_EXPORT_PATH;
+  if (!target) {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export planner backup',
+      defaultPath: `planner-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: 'Planner backup', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    target = result.filePath;
+  }
+  fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf8');
+  return target;
+});
+ipcMain.handle('data:import', async () => {
+  let source = process.env.PLANNER_TEST_IMPORT_PATH;
+  if (!source) {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import planner backup',
+      properties: ['openFile'],
+      filters: [{ name: 'Planner backup', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    source = result.filePaths[0];
+  }
+  try {
+    return { data: JSON.parse(fs.readFileSync(source, 'utf8')), path: source };
+  } catch (err) {
+    return { error: `Could not read ${source}: ${err.message}` };
+  }
+});
 
 app.whenReady().then(() => {
+  try {
+    storage.backupDaily();
+  } catch (err) {
+    console.error('Could not make the daily backup', err);
+  }
   buildMenu();
   createWindow();
   app.on('activate', () => {

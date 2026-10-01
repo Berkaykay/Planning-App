@@ -5,7 +5,33 @@ import { paths } from '../lib/routes.js';
 import Link from '../components/Link.jsx';
 import { useCategoryActions, CategoryNameInput } from '../components/categoryActions.jsx';
 
-export function ColorPicker({ value, onChange }) {
+const ICONS = ['📚', '🏫', '💼', '🏃', '💪', '🧘', '🍎', '🏠', '🛒', '💰', '🎨', '🎵', '🎮', '✈️', '❤️', '⭐', '🧪', '💻', '📝', '🌱'];
+
+// Pick an emoji icon for a category (or type your own).
+export function IconPicker({ value, onChange }) {
+  return (
+    <div className="icon-picker" role="radiogroup" aria-label="Icon">
+      <button type="button" role="radio" aria-checked={!value} className={`icon-option ${!value ? 'on' : ''}`} title="No icon" onClick={() => onChange('')}>
+        –
+      </button>
+      {ICONS.map((icon) => (
+        <button key={icon} type="button" role="radio" aria-checked={value === icon} aria-label={`Icon ${icon}`} className={`icon-option ${value === icon ? 'on' : ''}`} onClick={() => onChange(icon)}>
+          {icon}
+        </button>
+      ))}
+      <input
+        className="icon-custom"
+        aria-label="Custom icon"
+        placeholder="Own…"
+        maxLength={4}
+        value={ICONS.includes(value) ? '' : value}
+        onChange={(e) => onChange(e.target.value.trim())}
+      />
+    </div>
+  );
+}
+
+export function ColorPicker({ value, onChange, custom = false }) {
   return (
     <div className="color-picker" role="radiogroup" aria-label="Color">
       {CATEGORY_COLORS.map((color) => (
@@ -20,6 +46,12 @@ export function ColorPicker({ value, onChange }) {
           onClick={() => onChange(color)}
         />
       ))}
+      {custom && (
+        <label className={`swatch custom-swatch ${CATEGORY_COLORS.includes(value) ? '' : 'on'}`} title="Any color" style={{ background: value }}>
+          <input type="color" aria-label="Custom color" value={value} onChange={(e) => onChange(e.target.value)} />
+          <span aria-hidden>+</span>
+        </label>
+      )}
     </div>
   );
 }
@@ -76,7 +108,7 @@ export default function Categories() {
       <div className="category-cards">
         {state.categories.length === 0 && <p className="empty">No categories yet.</p>}
         {state.categories.map((c) => {
-          const plans = state.plans.filter((p) => p.categoryId === c.id);
+          const plans = state.plans.filter((p) => p.categoryId === c.id && !p.timetableId);
           const upcoming = plans.filter((p) => !p.repeat && p.date >= today).length;
           const repeating = plans.filter((p) => p.repeat).length;
           return (
@@ -90,13 +122,15 @@ export default function Categories() {
                 />
               ) : (
                 <h2>
+                  {c.icon && <span aria-hidden>{c.icon}</span>}
                   <Link to={paths.category(c.id)}>{c.name}</Link>
                 </h2>
               )}
               <div className="subtle">
                 {plans.length} plan{plans.length === 1 ? '' : 's'} · {upcoming} upcoming · {repeating} repeating
               </div>
-              <ColorPicker value={c.color} onChange={(value) => actions.recolor(c.id, value)} />
+              {c.description && <p className="category-description">{c.description}</p>}
+              <ColorPicker value={c.color} onChange={(value) => actions.recolor(c.id, value)} custom />
               <div className="card-actions">
                 <Link to={paths.category(c.id)} className="button">
                   Open

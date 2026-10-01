@@ -13,13 +13,15 @@ export default function Sidebar() {
   const [renamingId, setRenamingId] = useState(null);
 
   const counts = {};
-  for (const p of state.plans) if (p.categoryId) counts[p.categoryId] = (counts[p.categoryId] ?? 0) + 1;
+  // Lessons aren't plans, so they don't count here.
+  for (const p of state.plans) if (p.categoryId && !p.timetableId) counts[p.categoryId] = (counts[p.categoryId] ?? 0) + 1;
 
   const pages = [
     { to: paths.dashboard(), label: 'Dashboard', icon: '◧', active: route.page === 'dashboard' },
     { to: paths.calendar(), label: 'Calendar', icon: '▦', active: route.page === 'calendar' },
     { to: paths.day(today), label: 'Day Planner', icon: '☰', active: route.page === 'day' },
     { to: paths.timetable(), label: 'Timetable', icon: '▤', active: route.page === 'timetable' },
+    { to: paths.history(), label: 'History', icon: '↺', active: route.page === 'history' },
     { to: paths.categories(), label: 'Categories', icon: '◉', active: route.page === 'categories' },
   ];
 
@@ -74,9 +76,12 @@ export default function Sidebar() {
       </div>
 
       <div className="sidebar-section theme-section">
-        <div className="sidebar-heading">
-          <span>Theme</span>
-        </div>
+        <Link to={paths.settings()} className={`side-item ${route.page === 'settings' ? 'active' : ''}`}>
+          <span className="side-icon" aria-hidden>
+            ⚙
+          </span>
+          Settings
+        </Link>
         <div className="segmented" role="radiogroup" aria-label="Theme">
           {THEMES.map((theme) => (
             <button
@@ -141,7 +146,13 @@ function CategoryRow({ category, count, selected, renaming, onRenameStart, onRen
       data-testid="category-row"
     >
       <Link to={paths.category(category.id)} className="side-item">
-        <span className="dot" style={{ background: category.color }} />
+        {category.icon ? (
+          <span className="side-emoji" aria-hidden>
+            {category.icon}
+          </span>
+        ) : (
+          <span className="dot" style={{ background: category.color }} />
+        )}
         <span className="category-name">{category.name}</span>
         <span className="count">{count}</span>
       </Link>

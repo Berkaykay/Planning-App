@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { launchApp, tempDataDir, readData } from './helpers.js';
+import { launchApp, tempDataDir, readData, pointerDrag } from './helpers.js';
 import { addDays, todayKey, weekday, formatLong } from '../../src/lib/dates.js';
 
 let app;
@@ -75,21 +75,23 @@ test('timetable: set up weekly lessons once, they repeat with their own check ma
   // A "School" category was created for the lessons.
   await expect(sidebar().getByRole('link', { name: /School/ })).toBeVisible();
 
+  // Lessons show in their own strip, not as plans.
+  const lesson = (title) => page.getByTestId('lessons').getByRole('checkbox', { name: new RegExp(`^${title} `) });
   const monday = nextMonday();
   await goTo(`planner://day/${monday}`);
-  await expect(page.getByTestId('hour-8').getByTestId('plan')).toContainText('Math');
-  await expect(page.getByTestId('hour-8').getByTestId('plan')).toContainText('08:30–09:10');
-  await expect(page.getByTestId('hour-9').getByTestId('plan')).toContainText('Physics');
-  await expect(plan('Math')).toContainText('School');
-  await check('Math').click();
+  await expect(lesson('Math')).toContainText('08:30–09:10');
+  await expect(lesson('Physics')).toContainText('09:20–10:00');
+  await expect(page.getByTestId('plan')).toHaveCount(0);
+  await lesson('Math').click();
+  await expect(lesson('Math')).toHaveAttribute('aria-checked', 'true');
 
   // The next Monday has the same lessons, unchecked.
   await goTo(`planner://day/${addDays(monday, 7)}`);
-  await expect(check('Math')).toHaveAttribute('aria-checked', 'false');
+  await expect(lesson('Math')).toHaveAttribute('aria-checked', 'false');
   // Tuesday has its own lessons.
   await goTo(`planner://day/${addDays(monday, 1)}`);
-  await expect(plan('History')).toBeVisible();
-  await expect(plan('Physics')).toHaveCount(0);
+  await expect(lesson('History')).toBeVisible();
+  await expect(lesson('Physics')).toHaveCount(0);
 
   // Editing the timetable later keeps check marks.
   await sidebar().getByRole('link', { name: 'Timetable' }).click();
@@ -98,16 +100,16 @@ test('timetable: set up weekly lessons once, they repeat with their own check ma
   await expect(page.getByText('unsaved changes')).toBeVisible();
   await page.getByRole('button', { name: 'Save timetable' }).click();
   await goTo(`planner://day/${monday}`);
-  await expect(check('Math')).toHaveAttribute('aria-checked', 'true');
-  await expect(plan('Chemistry')).toBeVisible();
-  await expect(plan('Physics')).toHaveCount(0);
+  await expect(lesson('Math')).toHaveAttribute('aria-checked', 'true');
+  await expect(lesson('Chemistry')).toBeVisible();
+  await expect(lesson('Physics')).toHaveCount(0);
 
   // Deleting the timetable removes its lessons.
   await sidebar().getByRole('link', { name: 'Timetable' }).click();
   await page.getByRole('button', { name: 'Delete timetable' }).click();
   await dialog().getByRole('button', { name: 'Delete' }).click();
   await goTo(`planner://day/${monday}`);
-  await expect(page.getByTestId('plan')).toHaveCount(0);
+  await expect(page.getByTestId('lessons')).toHaveCount(0);
   expect(readData(dataDir).timetables).toEqual([]);
 });
 
@@ -155,14 +157,18 @@ test('tabs can be reordered by dragging, and theme and tab order persist', async
   await sidebar().getByRole('link', { name: 'Timetable' }).click();
   expect(await tabTitles()).toEqual(['Dashboard', 'Categories', 'Timetable']);
 
-  // Drop the last tab onto the left half of the first one.
-  await tabs.nth(2).dragTo(tabs.nth(0), { targetPosition: { x: 8, y: 10 } });
+  // Drag tabs along the strip, like in a browser.
+  const center = async (i) => {
+    await page.waitForTimeout(300); // let the previous drop finish gliding into place
+    const b = await tabs.nth(i).boundingBox();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  };
+  const first = await center(0);
+  await pointerDrag(page, await center(2), { x: first.x - 40, y: first.y });
   await expect.poll(tabTitles).toEqual(['Timetable', 'Dashboard', 'Categories']);
-  // Drop the first tab onto the right half of the last one.
-  const box = await tabs.nth(2).boundingBox();
-  await tabs.nth(0).dragTo(tabs.nth(2), { targetPosition: { x: box.width - 8, y: 10 } });
+  await pointerDrag(page, await center(0), { x: (await center(2)).x + 40, y: first.y });
   await expect.poll(tabTitles).toEqual(['Dashboard', 'Categories', 'Timetable']);
-  await tabs.nth(2).dragTo(tabs.nth(1), { targetPosition: { x: 8, y: 10 } });
+  await pointerDrag(page, await center(2), { x: (await center(1)).x - 30, y: first.y });
   await expect.poll(tabTitles).toEqual(['Dashboard', 'Timetable', 'Categories']);
 
   const theme = page.getByRole('radiogroup', { name: 'Theme' });

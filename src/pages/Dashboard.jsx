@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context.js';
-import { plansOn, isDone, dayProgress } from '../lib/recurrence.js';
+import { tasksOn, isDone, dayProgress, isLesson, unfinishedPlans, categoryStats, lessonsOn } from '../lib/recurrence.js';
 import { addDays, formatLong, relativeDayLabel } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import { newId } from '../lib/store.js';
@@ -8,7 +8,10 @@ import PlanItem from '../components/PlanItem.jsx';
 import Check from '../components/Check.jsx';
 import Link from '../components/Link.jsx';
 import RepeatTracker from '../components/RepeatTracker.jsx';
+import LessonStrip from '../components/LessonStrip.jsx';
 import { Progress, QuickAdd } from './DayPlanner.jsx';
+
+const MAX_UNFINISHED = 5;
 
 function greeting() {
   const h = new Date().getHours();
@@ -19,12 +22,11 @@ function greeting() {
 
 export default function Dashboard() {
   const { state, dispatch, today } = useApp();
-  const todays = plansOn(state.plans, today);
+  const todays = tasksOn(state.plans, today);
   const done = todays.filter((p) => isDone(p, today)).length;
   const dayDone = Boolean(state.days[today]?.done);
-  // Timetable lessons are tracked on the Timetable/Calendar pages; listing every lesson here would crowd the dashboard.
-  const repeating = state.plans.filter(
-    (p) => p.repeat && !p.timetableId && (!p.repeat.until || p.repeat.until >= today) && p.date <= today,
+  const routines = state.plans.filter(
+    (p) => p.repeat && !isLesson(p) && (!p.repeat.until || p.repeat.until >= today) && p.date <= today,
   );
   const upcoming = Array.from({ length: 7 }, (_, i) => addDays(today, i + 1));
 
@@ -58,74 +60,128 @@ export default function Dashboard() {
             placeholder="Add a plan for today"
             onAdd={(title) => dispatch({ type: 'plan/add', plan: { id: newId(), title, date: today, hour: null } })}
           />
+          <LessonStrip date={today} compact />
         </section>
 
-        <section className="card">
-          <div className="card-head">
-            <h2>Next 7 days</h2>
-            <Link to={paths.calendar()} className="card-link">
-              Calendar →
-            </Link>
-          </div>
-          <ul className="upcoming">
-            {upcoming.map((date) => {
-              const { total, done: d } = dayProgress(state.plans, date);
-              const titles = plansOn(state.plans, date).map((p) => p.title);
-              return (
-                <li key={date} className={state.days[date]?.done ? 'day-done' : ''}>
-                  <Link to={paths.day(date)} className="upcoming-day">
-                    <span className="day-heading">{relativeDayLabel(date, today)}</span>
-                    <span className="subtle ellipsis">{titles.length ? titles.join(', ') : 'Free'}</span>
-                    {total > 0 && (
-                      <span className="count">
-                        {d}/{total}
+        <div className="dashboard-side">
+          <Unfinished />
+
+          <section className="card">
+            <div className="card-head">
+              <h2>Next 7 days</h2>
+              <Link to={paths.calendar()} className="card-link">
+                Calendar →
+              </Link>
+            </div>
+            <ul className="upcoming">
+              {upcoming.map((date) => {
+                const { total, done: d } = dayProgress(state.plans, date);
+                const titles = tasksOn(state.plans, date).map((p) => p.title);
+                const lessons = lessonsOn(state.plans, date).length;
+                return (
+                  <li key={date} className={state.days[date]?.done ? 'day-done' : ''}>
+                    <Link to={paths.day(date)} className="upcoming-day">
+                      <span className="day-heading">{relativeDayLabel(date, today)}</span>
+                      <span className="subtle ellipsis">
+                        {titles.length ? titles.join(', ') : 'Free'}
+                        {lessons > 0 && <span className="lesson-note"> · {lessons} lessons</span>}
                       </span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+                      {total > 0 && (
+                        <span className="count">
+                          {d}/{total}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        </div>
+
+        {routines.length > 0 && (
+          <section className="card wide">
+            <div className="card-head">
+              <h2>Routines</h2>
+            </div>
+            {routines.map((p) => (
+              <RepeatTracker key={p.id} plan={p} />
+            ))}
+          </section>
+        )}
 
         <section className="card wide">
-          <div className="card-head">
-            <h2>Repeating plans</h2>
-            <span className="subtle">Check marks reset each time a plan comes around; past days are kept as history.</span>
-          </div>
-          {repeating.length === 0 ? (
-            <p className="empty">
-              No repeating plans yet. Set <strong>Repeat</strong> to daily, weekly or monthly when creating a plan to track
-              routines, or fill in the <Link to={paths.timetable()}>Timetable</Link> for your weekly school lessons.
-            </p>
-          ) : (
-            repeating.map((p) => <RepeatTracker key={p.id} plan={p} />)
-          )}
-        </section>
-
-        <section className="card">
           <div className="card-head">
             <h2>Categories</h2>
             <Link to={paths.categories()} className="card-link">
               Manage →
             </Link>
           </div>
-          <ul className="category-summary">
-            {state.categories.map((c) => {
-              const todayCount = todays.filter((p) => p.categoryId === c.id).length;
-              return (
-                <li key={c.id}>
-                  <Link to={paths.category(c.id)}>
-                    <span className="dot" style={{ background: c.color }} />
-                    {c.name}
-                    <span className="subtle">{todayCount ? `${todayCount} today` : ''}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="category-tiles">
+            {state.categories.map((c) => (
+              <CategoryTile key={c.id} category={c} todays={todays} />
+            ))}
+            {state.categories.length === 0 && <p className="empty">No categories yet.</p>}
+          </div>
         </section>
       </div>
     </div>
+  );
+}
+
+function CategoryTile({ category, todays }) {
+  const { state, today } = useApp();
+  const stats = categoryStats(state.plans, category.id, today);
+  const todayCount = todays.filter((p) => p.categoryId === category.id).length;
+  const week = stats.thisWeek;
+  return (
+    <Link to={paths.category(category.id)} className="category-tile" style={{ '--cat': category.color }} title={category.description || category.name}>
+      <span className="tile-icon" aria-hidden>
+        {category.icon || category.name.slice(0, 1).toUpperCase()}
+      </span>
+      <span className="tile-body">
+        <span className="tile-name">{category.name}</span>
+        <span className="subtle">
+          {todayCount ? `${todayCount} today` : 'Nothing today'}
+          {week.total > 0 && ` · ${week.done}/${week.total} this week`}
+        </span>
+        <span className="tile-bar">
+          <span style={{ width: `${week.total ? (week.done / week.total) * 100 : 0}%` }} />
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+// Plans from recent days that were never finished, with a quick way to bring them to today.
+function Unfinished() {
+  const { state, dispatch, today } = useApp();
+  const list = unfinishedPlans(state.plans, today);
+  if (!list.length) return null;
+  return (
+    <section className="card unfinished" data-testid="unfinished">
+      <div className="card-head">
+        <h2>Unfinished</h2>
+        <span className="subtle">{list.length} from past days</span>
+        <button className="link-button card-link" onClick={() => dispatch({ type: 'plans/moveToDate', ids: list.map((p) => p.id), date: today })}>
+          Move all to today
+        </button>
+      </div>
+      <div className="plan-list">
+        {list.slice(0, MAX_UNFINISHED).map((p) => (
+          <div key={p.id} className="unfinished-row">
+            <PlanItem plan={p} date={p.date} showDate showTime={false} />
+            <button className="small-button" onClick={() => dispatch({ type: 'plans/moveToDate', ids: [p.id], date: today })}>
+              Move to today
+            </button>
+          </div>
+        ))}
+      </div>
+      {list.length > MAX_UNFINISHED && (
+        <Link to={paths.history()} className="card-link more-link">
+          See all in History →
+        </Link>
+      )}
+    </section>
   );
 }
