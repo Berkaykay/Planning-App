@@ -11,7 +11,7 @@ import { ColorPicker } from './Categories.jsx';
 
 const byDate = (a, b) => (a.date === b.date ? comparePlans(a, b) : a.date < b.date ? -1 : 1);
 
-// All plans in one category (or the uncategorized ones when id is "none").
+// All plans in one category.
 export default function CategoryPage({ id }) {
   const { state, today } = useApp();
   const planActions = usePlanActions();
@@ -19,8 +19,7 @@ export default function CategoryPage({ id }) {
   const [renaming, setRenaming] = useState(false);
   const [showPast, setShowPast] = useState(false);
 
-  const uncategorized = id === 'none';
-  const category = uncategorized ? { id: 'none', name: 'Uncategorized' } : state.categories.find((c) => c.id === id);
+  const category = state.categories.find((c) => c.id === id);
 
   if (!category) {
     return (
@@ -34,16 +33,16 @@ export default function CategoryPage({ id }) {
     );
   }
 
-  const plans = state.plans.filter((p) => (p.categoryId ?? 'none') === id);
+  const plans = state.plans.filter((p) => p.categoryId === id);
   const repeating = plans.filter((p) => p.repeat);
   const upcoming = plans.filter((p) => !p.repeat && p.date >= today).sort(byDate);
   const past = plans.filter((p) => !p.repeat && p.date < today).sort(byDate).reverse();
 
   return (
-    <div className="category-page" style={{ '--cat': category.color ?? 'var(--muted-line)' }}>
+    <div className="category-page" style={{ '--cat': category.color }}>
       <header className="page-header row">
         <div className="category-title">
-          {!uncategorized && <span className="dot big" style={{ background: category.color }} />}
+          <span className="dot big" style={{ background: category.color }} />
           {renaming ? (
             <CategoryNameInput
               initial={category.name}
@@ -56,16 +55,12 @@ export default function CategoryPage({ id }) {
           )}
         </div>
         <div className="header-actions">
-          {!uncategorized && (
-            <>
-              <ColorPicker value={category.color} onChange={(c) => categoryActions.recolor(category.id, c)} />
-              <button onClick={() => setRenaming(true)}>Rename</button>
-              <button className="danger" onClick={() => categoryActions.remove(category)}>
-                Delete
-              </button>
-            </>
-          )}
-          <button className="primary" onClick={() => planActions.create({ categoryId: uncategorized ? null : id })}>
+          <ColorPicker value={category.color} onChange={(c) => categoryActions.recolor(category.id, c)} />
+          <button onClick={() => setRenaming(true)}>Rename</button>
+          <button className="danger" onClick={() => categoryActions.remove(category)}>
+            Delete
+          </button>
+          <button className="primary" onClick={() => planActions.create({ categoryId: id })}>
             + Add plan
           </button>
         </div>

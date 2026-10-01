@@ -1,15 +1,25 @@
 // All app data lives in one object, changed only through `reducer` actions.
 // The whole object is saved to disk after every change.
-import { isDateKey } from './dates.js';
+import { isDateKey, parseTime } from './dates.js';
 import { HOME } from './routes.js';
 import { FREQUENCIES } from './recurrence.js';
 
-export const DATA_VERSION = 1;
+export const DATA_VERSION = 2;
 const MAX_HISTORY = 100;
 
+// Muted colors: categories show up as small dots and thin markers, not big colored areas.
 export const CATEGORY_COLORS = [
-  '#4f7cff', '#22a06b', '#e5484d', '#f59e0b', '#a855f7', '#0ea5e9', '#ec4899', '#64748b',
+  '#5b7fd6', '#4f9d7e', '#d0715b', '#d4a03f', '#9273c7', '#3f9bb0', '#cf6b8f', '#7c8593',
 ];
+
+// Version 1 used brighter colors; existing categories are moved to their calmer equivalents.
+const OLD_COLORS = {
+  '#4f7cff': '#5b7fd6', '#22a06b': '#4f9d7e', '#e5484d': '#d0715b', '#f59e0b': '#d4a03f',
+  '#a855f7': '#9273c7', '#0ea5e9': '#3f9bb0', '#ec4899': '#cf6b8f', '#64748b': '#7c8593',
+};
+
+export const THEMES = ['system', 'light', 'dark'];
+const DEFAULT_SETTINGS = { theme: 'system' };
 
 export const newId = () => globalThis.crypto.randomUUID();
 
@@ -26,6 +36,8 @@ export function createInitialData() {
     ],
     plans: [],
     days: {},
+    timetables: [],
+    settings: { ...DEFAULT_SETTINGS },
     session: { tabs: [tab], activeTabId: tab.id },
   };
 }
@@ -41,8 +53,10 @@ function normalizeRepeat(repeat) {
   return out;
 }
 
+const intIn = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
+
 export function normalizePlan(raw) {
-  const hour = Number.isInteger(raw.hour) && raw.hour >= 0 && raw.hour <= 23 ? raw.hour : null;
+  const hour = intIn(raw.hour, 0, 23) ? raw.hour : null;
   return {
     id: raw.id || newId(),
     title: String(raw.title ?? '').trim() || 'Untitled plan',
@@ -50,11 +64,70 @@ export function normalizePlan(raw) {
     categoryId: raw.categoryId || null,
     date: raw.date,
     hour,
+    // Start minute and length (in minutes) of a timed plan; e.g. 08:30-09:10 = hour 8, minute 30, duration 40.
+    minute: hour !== null && intIn(raw.minute, 0, 59) ? raw.minute : 0,
+    duration: hour !== null && intIn(raw.duration, 1, 24 * 60) ? raw.duration : null,
     repeat: normalizeRepeat(raw.repeat),
     doneDates: Array.isArray(raw.doneDates) ? raw.doneDates.filter(isDateKey) : [],
     skipDates: Array.isArray(raw.skipDates) ? raw.skipDates.filter(isDateKey) : [],
     createdAt: raw.createdAt || new Date().toISOString(),
+    // Plans generated from a timetable remember which timetable cell they came from.
+    ...(raw.timetableId && { timetableId: raw.timetableId, timetableKey: raw.timetableKey }),
   };
+}
+
+export function normalizeTimetable(raw) {
+  const weekdays = [...new Set((raw.weekdays ?? [1, 2, 3, 4, 5]).filter((d) => intIn(d, 0, 6)))].sort();
+  const periods = (raw.periods ?? [])
+    .filter((p) => p?.id && parseTime(p.start) !== null)
+    .map((p) => ({ id: String(p.id), start: p.start, end: parseTime(p.end) !== null ? p.end : '' }));
+  const cells = {};
+  for (const [key, value] of Object.entries(raw.cells ?? {})) {
+    if (typeof value === 'string' && value.trim()) cells[key] = value.trim();
+  }
+  return {
+    id: raw.id || newId(),
+    name: String(raw.name ?? '').trim() || 'School',
+    categoryId: raw.categoryId || null,
+    weekdays,
+    periods,
+    cells,
+    startDate: raw.startDate,
+    until: isDateKey(raw.until) ? raw.until : null,
+  };
+}
+
+// One weekly repeating plan per filled timetable cell. Plans that already exist for a cell
+// keep their id, notes and check marks, so re-saving a timetable never loses history.
+function timetablePlans(timetable, existing) {
+  const byKey = new Map(existing.map((p) => [p.timetableKey, p]));
+  const periods = new Map(timetable.periods.map((p) => [p.id, p]));
+  const plans = [];
+  for (const [key, subject] of Object.entries(timetable.cells)) {
+    const [day, periodId] = key.split(':');
+    const weekday = Number(day);
+    const period = periods.get(periodId);
+    if (!timetable.weekdays.includes(weekday) || !period) continue;
+    const start = parseTime(period.start);
+    const end = parseTime(period.end);
+    const old = byKey.get(key);
+    plans.push(
+      normalizePlan({
+        ...old,
+        id: old?.id ?? newId(),
+        title: subject,
+        categoryId: timetable.categoryId,
+        date: timetable.startDate,
+        hour: Math.floor(start / 60),
+        minute: start % 60,
+        duration: end !== null && end > start ? end - start : null,
+        repeat: { freq: 'weekly', weekdays: [weekday], until: timetable.until },
+        timetableId: timetable.id,
+        timetableKey: key,
+      }),
+    );
+  }
+  return plans;
 }
 
 // Makes data loaded from disk safe to use, filling in anything missing or malformed.
@@ -62,7 +135,7 @@ export function normalizeData(raw) {
   if (!raw || typeof raw !== 'object') return createInitialData();
   const categories = (Array.isArray(raw.categories) ? raw.categories : [])
     .filter((c) => c && c.id && typeof c.name === 'string')
-    .map((c) => ({ id: c.id, name: c.name, color: c.color || CATEGORY_COLORS[0] }));
+    .map((c) => ({ id: c.id, name: c.name, color: OLD_COLORS[c.color] ?? (c.color || CATEGORY_COLORS[0]) }));
   const categoryIds = new Set(categories.map((c) => c.id));
   const plans = (Array.isArray(raw.plans) ? raw.plans : [])
     .filter((p) => p && isDateKey(p.date))
@@ -81,7 +154,14 @@ export function normalizeData(raw) {
     }));
   if (!tabs.length) tabs = [newTab()];
   const activeTabId = tabs.some((t) => t.id === raw.session?.activeTabId) ? raw.session.activeTabId : tabs[0].id;
-  return { version: DATA_VERSION, categories, plans, days, session: { tabs, activeTabId } };
+  const timetables = (Array.isArray(raw.timetables) ? raw.timetables : [])
+    .filter((t) => t?.id && isDateKey(t.startDate))
+    .map(normalizeTimetable);
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...(THEMES.includes(raw.settings?.theme) && { theme: raw.settings.theme }),
+  };
+  return { version: DATA_VERSION, categories, plans, days, timetables, settings, session: { tabs, activeTabId } };
 }
 
 export const activeTab = (state) =>
@@ -141,6 +221,7 @@ export function reducer(state, action) {
         ...state,
         categories: state.categories.filter((c) => c.id !== action.id),
         plans: state.plans.map((p) => (p.categoryId === action.id ? { ...p, categoryId: null } : p)),
+        timetables: state.timetables.map((t) => (t.categoryId === action.id ? { ...t, categoryId: null } : t)),
       };
 
     // ---- Plans ------------------------------------------------------------
@@ -166,6 +247,7 @@ export function reducer(state, action) {
         ...series,
         ...action.changes,
         id: action.newId ?? newId(),
+        timetableId: null,
         repeat: null,
         date: action.changes.date ?? action.date,
         skipDates: [],
@@ -193,6 +275,31 @@ export function reducer(state, action) {
       return { ...state, days };
     }
 
+    // ---- Timetables -------------------------------------------------------
+    case 'timetable/save': {
+      const timetable = normalizeTimetable(action.timetable);
+      const existing = state.plans.filter((p) => p.timetableId === timetable.id);
+      const others = state.plans.filter((p) => p.timetableId !== timetable.id);
+      const known = state.timetables.some((t) => t.id === timetable.id);
+      return {
+        ...state,
+        timetables: known
+          ? state.timetables.map((t) => (t.id === timetable.id ? timetable : t))
+          : [...state.timetables, timetable],
+        plans: [...others, ...timetablePlans(timetable, existing)],
+      };
+    }
+    case 'timetable/delete':
+      return {
+        ...state,
+        timetables: state.timetables.filter((t) => t.id !== action.id),
+        plans: state.plans.filter((p) => p.timetableId !== action.id),
+      };
+
+    // ---- Settings ---------------------------------------------------------
+    case 'settings/update':
+      return { ...state, settings: { ...state.settings, ...action.changes } };
+
     // ---- Tabs and navigation ----------------------------------------------
     case 'tab/open': {
       const tab = newTab(action.path);
@@ -214,6 +321,15 @@ export function reducer(state, action) {
       }
       const nextActive = activeTabId === action.id ? remaining[Math.min(index, remaining.length - 1)].id : activeTabId;
       return { ...state, session: { tabs: remaining, activeTabId: nextActive } };
+    }
+    case 'tab/move': {
+      // Moves a tab so it ends up at position `toIndex`.
+      const tabs = [...state.session.tabs];
+      const from = tabs.findIndex((t) => t.id === action.id);
+      if (from === -1) return state;
+      const [tab] = tabs.splice(from, 1);
+      tabs.splice(Math.max(0, Math.min(action.toIndex, tabs.length)), 0, tab);
+      return { ...state, session: { ...state.session, tabs } };
     }
     case 'tab/activate':
       return state.session.tabs.some((t) => t.id === action.id)

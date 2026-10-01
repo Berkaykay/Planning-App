@@ -34,7 +34,7 @@ export function useCategoryActions() {
         title: 'Delete category',
         message:
           count > 0
-            ? `Delete "${category.name}"? Its ${count} plan${count === 1 ? '' : 's'} will be kept as uncategorized.`
+            ? `Delete "${category.name}"? Its ${count} plan${count === 1 ? '' : 's'} will be kept, without a category.`
             : `Delete "${category.name}"?`,
         confirmLabel: 'Delete',
         danger: true,

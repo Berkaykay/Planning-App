@@ -9,7 +9,7 @@
 // Completion is stored per occurrence in `doneDates`, so each day of a repeating
 // plan starts unchecked and past check marks stay as history.
 
-import { addDays, daysInMonth, fromKey, weekday, WEEKDAY_NAMES, WEEKDAY_ORDER, formatShort } from './dates.js';
+import { addDays, daysInMonth, fromKey, pad, weekday, WEEKDAY_NAMES, WEEKDAY_ORDER, formatShort } from './dates.js';
 
 export const FREQUENCIES = ['daily', 'weekly', 'monthly'];
 
@@ -41,9 +41,9 @@ export const isDone = (plan, date) => plan.doneDates.includes(date);
 
 // Sort order inside a day: all-day plans first, then by hour, then by title.
 export function comparePlans(a, b) {
-  const ha = a.hour ?? -1;
-  const hb = b.hour ?? -1;
-  if (ha !== hb) return ha - hb;
+  const ta = a.hour === null ? -1 : a.hour * 60 + (a.minute ?? 0);
+  const tb = b.hour === null ? -1 : b.hour * 60 + (b.minute ?? 0);
+  if (ta !== tb) return ta - tb;
   return a.title.localeCompare(b.title);
 }
 
@@ -83,4 +83,30 @@ export function streak(plan, today) {
     count++;
   }
   return count;
+}
+
+// Summary numbers for a month ("YYYY-MM"). Plan counts only include days up to today.
+export function monthStats(plans, days, month, today) {
+  const [y, m] = month.split('-').map(Number);
+  const stats = { daysDone: 0, daysElapsed: 0, plansDone: 0, plansTotal: 0, bestStreak: 0, busiest: null, busiestCount: 0 };
+  let run = 0;
+  for (let d = 1; d <= daysInMonth(y, m - 1); d++) {
+    const date = `${month}-${pad(d)}`;
+    const list = plansOn(plans, date);
+    if (list.length > stats.busiestCount) {
+      stats.busiest = date;
+      stats.busiestCount = list.length;
+    }
+    if (date <= today) {
+      stats.daysElapsed++;
+      stats.plansTotal += list.length;
+      stats.plansDone += list.filter((p) => isDone(p, date)).length;
+    }
+    if (days[date]?.done) {
+      stats.daysDone++;
+      run++;
+      stats.bestStreak = Math.max(stats.bestStreak, run);
+    } else run = 0;
+  }
+  return stats;
 }

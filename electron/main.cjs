@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, nativeTheme, shell } = require('electron');
 const path = require('path');
 const { createStorage } = require('./storage.cjs');
 
@@ -68,7 +68,7 @@ function createWindow() {
     minWidth: 820,
     minHeight: 560,
     title: 'Planner',
-    backgroundColor: '#f5f6f8',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#121316' : '#f4f4f5',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

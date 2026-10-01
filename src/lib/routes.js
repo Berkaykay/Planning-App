@@ -21,6 +21,8 @@ export function parseRoute(path) {
       return isDateKey(param) ? { page: 'day', date: param } : { page: 'notfound', path: clean };
     case 'categories':
       return param === undefined ? { page: 'categories' } : { page: 'notfound', path: clean };
+    case 'timetable':
+      return param === undefined ? { page: 'timetable' } : { page: 'notfound', path: clean };
     case 'category':
       return param ? { page: 'category', id: param } : { page: 'categories' };
     default:
@@ -33,6 +35,7 @@ export const paths = {
   calendar: (month) => (month ? `calendar/${month}` : 'calendar'),
   day: (date) => `day/${date}`,
   categories: () => 'categories',
+  timetable: () => 'timetable',
   category: (id) => `category/${id}`,
 };
 
@@ -46,14 +49,14 @@ export function routeTitle(route, categories) {
       return route.date === todayKey() ? 'Today' : formatMedium(route.date);
     case 'categories':
       return 'Categories';
-    case 'category': {
-      if (route.id === 'none') return 'Uncategorized';
+    case 'timetable':
+      return 'Timetable';
+    case 'category':
       return categories.find((c) => c.id === route.id)?.name ?? 'Missing category';
-    }
     default:
       return 'Page not found';
   }
 }
 
 export const routeIcon = (route) =>
-  ({ dashboard: '◧', calendar: '▦', day: '☰', categories: '◉', category: '●' })[route.page] ?? '⚠';
+  ({ dashboard: '◧', calendar: '▦', day: '☰', timetable: '▤', categories: '◉', category: '●' })[route.page] ?? '⚠';

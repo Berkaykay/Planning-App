@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from './Dialogs.jsx';
-import { formatHour, formatMedium, isDateKey, weekday, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../lib/dates.js';
+import { formatMedium, formatTime, isDateKey, minutesToTime, parseTime, weekday, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../lib/dates.js';
 import { describeRepeat } from '../lib/recurrence.js';
-
-const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
 // Create or edit a plan. Resolves with { values, scope } where scope is 'all' or 'one'
 // ('one' = only the occurrence on `occurrenceDate` of a repeating plan).
@@ -14,7 +12,11 @@ export default function PlanDialog({ categories, initial, occurrenceDate, onClos
   const [title, setTitle] = useState(initial.title ?? '');
   const [notes, setNotes] = useState(initial.notes ?? '');
   const [date, setDate] = useState(isSeries && scope === 'one' ? occurrenceDate : initial.date);
-  const [hour, setHour] = useState(initial.hour ?? null);
+  const timed = initial.hour !== null && initial.hour !== undefined;
+  const startMinutes = timed ? initial.hour * 60 + (initial.minute ?? 0) : null;
+  const [allDay, setAllDay] = useState(!timed);
+  const [start, setStart] = useState(timed ? formatTime(initial.hour, initial.minute ?? 0) : '09:00');
+  const [end, setEnd] = useState(timed && initial.duration ? minutesToTime(startMinutes + initial.duration) : '');
   const [categoryId, setCategoryId] = useState(initial.categoryId ?? '');
   const [freq, setFreq] = useState(initial.repeat?.freq ?? 'none');
   const [weekdays, setWeekdays] = useState(initial.repeat?.weekdays?.length ? initial.repeat.weekdays : [weekday(initial.date)]);
@@ -30,16 +32,33 @@ export default function PlanDialog({ categories, initial, occurrenceDate, onClos
   const toggleWeekday = (d) =>
     setWeekdays((list) => (list.includes(d) ? list.filter((x) => x !== d) : [...list, d]));
 
+  // Changing the start time moves the end time along with it, keeping the length.
+  const changeStart = (value) => {
+    const [oldStart, oldEnd, next] = [parseTime(start), parseTime(end), parseTime(value)];
+    if (oldStart !== null && oldEnd !== null && next !== null && oldEnd > oldStart) {
+      setEnd(minutesToTime(Math.min(next + oldEnd - oldStart, 23 * 60 + 59)));
+    }
+    setStart(value);
+  };
+
   const submit = () => {
     if (!title.trim()) return setError('Please give the plan a title.');
     if (!isDateKey(date)) return setError('Please pick a valid date.');
+    let time = { hour: null, minute: 0, duration: null };
+    if (!allDay) {
+      const s = parseTime(start);
+      const e = parseTime(end);
+      if (s === null) return setError('Please enter a start time, or tick "All day".');
+      if (end && (e === null || e <= s)) return setError('The end time must be after the start time.');
+      time = { hour: Math.floor(s / 60), minute: s % 60, duration: e === null ? null : e - s };
+    }
     let repeat = null;
     if (!onlyThisDay && freq !== 'none') {
       if (freq === 'weekly' && !weekdays.length) return setError('Pick at least one weekday.');
       if (until && until < date) return setError('The end date must be after the start date.');
       repeat = { freq, weekdays: freq === 'weekly' ? weekdays : undefined, until: until || null };
     }
-    const values = { title: title.trim(), notes, date, hour, categoryId: categoryId || null };
+    const values = { title: title.trim(), notes, date, ...time, categoryId: categoryId || null };
     if (!onlyThisDay) values.repeat = repeat;
     onClose({ values, scope });
   };
@@ -65,6 +84,12 @@ export default function PlanDialog({ categories, initial, occurrenceDate, onClos
         </>
       }
     >
+      {initial.timetableId && scope === 'all' && (
+        <p className="hint">
+          This lesson comes from your Timetable. To change it for every week, edit the Timetable page instead; saving the
+          timetable again overwrites changes made here.
+        </p>
+      )}
       {isSeries && (
         <fieldset className="field scope">
           <legend>This plan repeats. Apply changes to</legend>
@@ -87,17 +112,24 @@ export default function PlanDialog({ categories, initial, occurrenceDate, onClos
           <span>{repeating ? 'Starts on' : 'Date'}</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" required />
         </label>
-        <label className="field">
+        <div className="field time-field">
           <span>Time</span>
-          <select aria-label="Time" value={hour ?? ''} onChange={(e) => setHour(e.target.value === '' ? null : Number(e.target.value))}>
-            <option value="">All day</option>
-            {HOURS.map((h) => (
-              <option key={h} value={h}>
-                {formatHour(h)}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div className="time-inputs">
+            <label className="inline-check">
+              <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
+              All day
+            </label>
+            {!allDay && (
+              <>
+                <input type="time" aria-label="Start time" value={start} onChange={(e) => changeStart(e.target.value)} />
+                <span className="subtle">to</span>
+                <input type="time" aria-label="End time" value={end} onChange={(e) => setEnd(e.target.value)} />
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="field-row">
         <label className="field">
           <span>Category</span>
           <select aria-label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>

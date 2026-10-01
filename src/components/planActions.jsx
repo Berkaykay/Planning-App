@@ -2,7 +2,7 @@ import React from 'react';
 import { useApp } from '../context.js';
 import { newId } from '../lib/store.js';
 import { isDone } from '../lib/recurrence.js';
-import { formatMedium, formatHour } from '../lib/dates.js';
+import { formatMedium, formatTimeRange } from '../lib/dates.js';
 import PlanDialog from './PlanDialog.jsx';
 
 // Shared add / edit / move / delete / complete behavior for plans, used by every page.
@@ -26,10 +26,12 @@ export function usePlanActions() {
     },
 
     async create(defaults = {}) {
+      // Ignore unset defaults so they can't override the fallbacks (e.g. an undefined date).
+      const given = Object.fromEntries(Object.entries(defaults).filter(([, v]) => v !== undefined));
       const result = await dialogs.open((close) => (
         <PlanDialog
           categories={state.categories}
-          initial={{ date: today, hour: null, categoryId: null, repeat: null, ...defaults }}
+          initial={{ date: today, hour: null, categoryId: null, repeat: null, ...given }}
           onClose={close}
         />
       ));
@@ -51,13 +53,18 @@ export function usePlanActions() {
     // Moves a plan's occurrence on `date` to another date and/or hour (hour null = all day).
     async move(plan, date, to) {
       if (to.date === date && to.hour === plan.hour) return;
+      // Moving between hour rows keeps the minutes; moving to "All day" drops the time.
+      if (to.hour === null) Object.assign(to, { minute: 0, duration: null });
       if (!plan.repeat) {
         dispatch({ type: 'plan/update', id: plan.id, changes: to });
         return;
       }
       const scope = to.date === date ? await askScope(plan, 'Move', date) : 'one';
       if (scope === 'one') dispatch({ type: 'plan/detach', id: plan.id, date, changes: to });
-      else if (scope === 'all') dispatch({ type: 'plan/update', id: plan.id, changes: { hour: to.hour } });
+      else if (scope === 'all') {
+        const { date: _ignored, ...time } = to;
+        dispatch({ type: 'plan/update', id: plan.id, changes: time });
+      }
     },
 
     async remove(plan, date) {
@@ -74,7 +81,7 @@ export function usePlanActions() {
         else if (scope === 'all') dispatch({ type: 'plan/delete', id: plan.id });
         return;
       }
-      const when = plan.hour === null ? formatMedium(plan.date) : `${formatMedium(plan.date)} at ${formatHour(plan.hour)}`;
+      const when = plan.hour === null ? formatMedium(plan.date) : `${formatMedium(plan.date)}, ${formatTimeRange(plan)}`;
       const ok = await dialogs.confirm({
         title: 'Delete plan',
         message: `Delete "${plan.title}" (${when})?`,
