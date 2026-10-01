@@ -1,6 +1,7 @@
 {
   "name": "planning-app",
-  "version": "1.4.0",
+  "version": "1.4.1",
+  "desktopName": "planner.desktop",
   "productName": "Planner",
   "description": "A desktop planning app with browser-style tabs, categories, daily and hourly plans.",
   "author": "Berkaykay",
@@ -70,6 +71,7 @@
         "AppImage"
       ],
       "category": "Office",
+      "syncDesktopName": true,
       "artifactName": "Planner-${version}-linux.${ext}"
     }
   }

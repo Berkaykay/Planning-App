@@ -21,7 +21,7 @@ import LessonStrip from '../components/LessonStrip.jsx';
 import { Progress, QuickAdd } from './DayPlanner.jsx';
 import { dropAttr } from '../components/dragDrop.jsx';
 import { usePlanActions } from '../components/planActions.jsx';
-import { useDeadlineActions, DeadlineItem } from '../components/deadlineActions.jsx';
+import { useDeadlineActions, DeadlineItem, DayFlag } from '../components/deadlineActions.jsx';
 import { FlagIcon } from '../components/Icons.jsx';
 import { deadlinesDueOn } from '../lib/recurrence.js';
 
@@ -124,11 +124,7 @@ export default function Calendar({ month, date: initialDate }) {
                 >
                   <div className="cell-head">
                     <span className="cell-day">{fromKey(date).getDate()}</span>
-                    {deadlinesDueOn(state.deadlines, date).some((d) => !d.done) && (
-                      <span className="cell-flag" title={deadlinesDueOn(state.deadlines, date).map((d) => d.title).join(', ')} data-testid="cell-flag">
-                        <FlagIcon size={13} />
-                      </span>
-                    )}
+                    <DayFlag date={date} />
                     {plans.length > 0 && (
                       <span className={`cell-count ${done === plans.length ? 'all-done' : ''}`}>
                         {done}/{plans.length}
@@ -164,6 +160,8 @@ function SelectedDay({ date, onOpen }) {
   const { state, dispatch, today } = useApp();
   const deadlineActions = useDeadlineActions();
   const deadlines = deadlinesDueOn(state.deadlines, date);
+  const openOnes = deadlines.filter((d) => !d.done);
+  const finished = deadlines.filter((d) => d.done);
   // One list in time order: checking a plan crosses it out in place, so nothing jumps around.
   const plans = tasksOn(state.plans, date);
   const completed = plans.filter((p) => isDone(p, date));
@@ -182,12 +180,23 @@ function SelectedDay({ date, onOpen }) {
       </div>
       {plans.length > 0 && <Progress done={completed.length} total={plans.length} />}
       <div className="selected-body">
-        {deadlines.length > 0 && (
+        {openOnes.length > 0 && (
           <div className="plan-group" data-testid="day-deadlines">
-            <div className="section-label">Deadlines · {deadlines.length}</div>
+            <div className="section-label">Deadlines · {openOnes.length}</div>
             <div className="plan-list">
-              {deadlines.map((d) => (
+              {openOnes.map((d) => (
                 <DeadlineItem key={d.id} deadline={d} />
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Finished deadlines are kept apart (faded) so it's clear they're done; uncheck to reopen. */}
+        {finished.length > 0 && (
+          <div className="plan-group finished-deadlines" data-testid="finished-deadlines">
+            <div className="section-label">Finished · {finished.length}</div>
+            <div className="plan-list">
+              {finished.map((d) => (
+                <DeadlineItem key={d.id} deadline={d} compact />
               ))}
             </div>
           </div>

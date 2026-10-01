@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context.js';
 import {
   tasksOn,
@@ -8,17 +8,15 @@ import {
   unfinishedPlans,
   categoryStats,
   lessonsOn,
-  openDeadlines,
+  dashboardDeadlines,
   currentStreak,
   rangeStats,
   upNext,
-  deadlinesDueOn,
 } from '../lib/recurrence.js';
 import { addDays, formatLong, formatTime, formatTimeRange, formatWeekday, fromKey, relativeDayLabel, weekStart } from '../lib/dates.js';
-import { DeadlineItem, useDeadlineActions } from '../components/deadlineActions.jsx';
+import { DayFlag, DeadlineItem, useDeadlineActions } from '../components/deadlineActions.jsx';
 import { useNow } from '../components/LessonStrip.jsx';
 import { DayStamp } from '../components/Check.jsx';
-import { FlagIcon } from '../components/Icons.jsx';
 import { paths } from '../lib/routes.js';
 import { newId } from '../lib/store.js';
 import PlanItem from '../components/PlanItem.jsx';
@@ -220,7 +218,6 @@ function WeekStrip() {
       {Array.from({ length: 7 }, (_, i) => addDays(start, i)).map((date) => {
         const { total, done } = dayProgress(state.plans, date);
         const dayDone = Boolean(state.days[date]?.done);
-        const flags = deadlinesDueOn(state.deadlines, date).filter((d) => !d.done).length;
         return (
           <button
             key={date}
@@ -235,11 +232,7 @@ function WeekStrip() {
             </span>
             <span className="strip-count">
               {total ? `${done}/${total}` : '–'}
-              {flags > 0 && (
-                <span className="strip-flag" title={`${flags} deadline${flags === 1 ? '' : 's'}`}>
-                  <FlagIcon size={11} />
-                </span>
-              )}
+              <DayFlag date={date} className="strip-flag" size={11} />
             </span>
             {dayDone && <DayStamp />}
           </button>
@@ -286,23 +279,41 @@ function UpNext() {
 function Deadlines() {
   const { state, today } = useApp();
   const actions = useDeadlineActions();
-  const list = openDeadlines(state.deadlines, today, today);
+  const [showPast, setShowPast] = useState(false);
+  // Checked deadlines stay where they are (crossed out) until their day is over, so a misclick is
+  // one click to undo; older finished ones are folded away at the bottom.
+  const { current, past } = dashboardDeadlines(state.deadlines, today);
+  const open = current.filter((d) => !d.done).length;
   return (
     <section className="card deadlines-card" data-testid="deadlines">
       <div className="card-head">
         <h2>Deadlines</h2>
-        <span className="subtle">{list.length ? `${list.length} open` : ''}</span>
+        <span className="subtle">{open ? `${open} open` : ''}</span>
         <button className="small-button card-link" onClick={() => actions.create({ due: addDays(today, 7) })}>
           + Add deadline
         </button>
       </div>
-      {list.length === 0 ? (
+      {current.length === 0 ? (
         <p className="empty">No deadlines. Add one here, or right-click a day in the calendar.</p>
       ) : (
         <div className="plan-list">
-          {list.map((d) => (
+          {current.map((d) => (
             <DeadlineItem key={d.id} deadline={d} />
           ))}
+        </div>
+      )}
+      {past.length > 0 && (
+        <div className="done-fold">
+          <button className="link-button section-toggle" aria-expanded={showPast} onClick={() => setShowPast(!showPast)}>
+            {showPast ? '▾' : '▸'} Done ({past.length})
+          </button>
+          {showPast && (
+            <div className="plan-list">
+              {past.map((d) => (
+                <DeadlineItem key={d.id} deadline={d} compact />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>

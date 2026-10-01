@@ -279,12 +279,51 @@ a.link {
   height: 100%;
 }
 
+/* The tab strip doubles as the window's title bar, like a browser: app icon, tabs, "+", then
+   empty space to drag the window by. On Windows and Linux the window buttons are drawn over the
+   right end (the env() padding keeps tabs from going under them); on macOS the traffic lights sit
+   at the left. */
+.titlebar {
+  display: flex;
+  align-items: stretch;
+  height: 40px;
+  flex-shrink: 0;
+  background: var(--chrome);
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+  user-select: none;
+}
+
+.titlebar.platform-darwin {
+  padding-left: 72px;
+}
+
+.app-logo {
+  width: 20px;
+  height: 20px;
+  align-self: center;
+  margin: 0 4px 0 12px;
+  flex: none;
+  -webkit-app-region: drag;
+}
+
+.titlebar.platform-darwin .app-logo {
+  display: none;
+}
+
+.titlebar-drag {
+  flex: 1;
+  min-width: 48px;
+  -webkit-app-region: drag;
+}
+
 .tabbar {
   display: flex;
   align-items: flex-end;
   gap: 2px;
+  flex: 0 1 auto;
+  min-width: 0;
   background: var(--chrome);
-  padding: 6px 8px 0;
+  padding: 6px 4px 0 8px;
   overflow-x: auto;
   /* Only ever scroll sideways, and without a visible scrollbar. */
   overflow-y: hidden;
@@ -2575,6 +2614,16 @@ body.dragging-plan * {
   gap: 14px;
 }
 
+/* The week navigation and the day headers stay at the top while scrolling through the hours. */
+.week-page > .month-header {
+  position: sticky;
+  top: -22px; /* flush with the top of the page, over its 22px top padding */
+  z-index: 4;
+  height: 56px;
+  margin-top: -12px;
+  background: var(--bg);
+}
+
 .week-title {
   min-width: 200px;
   text-align: center;
@@ -2586,7 +2635,18 @@ body.dragging-plan * {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  overflow: hidden;
+  /* clip (not hidden) so the day headers can stay stuck to the top while scrolling */
+  overflow: clip;
+}
+
+/* The day headers stay visible while scrolling through the 24 hours. */
+.week-corner,
+.week-day-head {
+  position: sticky;
+  /* just below the sticky week navigation (56px tall, starting 22px above the padding edge) */
+  top: 34px;
+  z-index: 3;
+  background: var(--surface);
 }
 
 .week-corner,
@@ -2810,6 +2870,89 @@ body.dragging-plan * {
 .deadline.done .deadline-title {
   text-decoration: line-through;
   color: var(--muted);
+}
+
+.deadline.done {
+  opacity: 0.8;
+}
+
+.deadline.done .deadline-flag {
+  color: var(--success);
+}
+
+/* Countdown badge: "3 days left", "Tomorrow", "Today", "2 days late", "Done". */
+.days-left {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent-text) 14%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.deadline.near .days-left {
+  color: #c98a2b;
+  background: color-mix(in srgb, #d4a03f 16%, transparent);
+}
+
+.deadline.soon .days-left {
+  color: #b07a1c;
+  background: color-mix(in srgb, #d4a03f 24%, transparent);
+}
+
+.deadline.overdue .days-left {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.deadline.done .days-left {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.deadline.compact .days-left {
+  font-size: 11px;
+  padding: 1px 7px;
+}
+
+/* Deadlines due on the shown day, at the top of the Day Planner's All day section. */
+.due-here {
+  margin-bottom: 8px;
+}
+
+.due-here .deadline:not(.done) {
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+}
+
+.finished-deadlines .deadline {
+  opacity: 0.7;
+}
+
+.done-fold {
+  margin-top: 10px;
+}
+
+.done-fold .plan-list {
+  margin-top: 6px;
+}
+
+.flag-count {
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 1px;
+}
+
+.flag-check {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.cell-flag.done,
+.strip-flag.done {
+  color: var(--success);
 }
 
 .deadline-main {

@@ -43,6 +43,7 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 ## Features
 
 **Browser-style navigation**
+- The tab strip is the window's title bar, like a browser: the Planner icon, your tabs and `+`, then empty space you can drag the window by, with minimize / maximize / close on the right. There's no menu bar (Alt doesn't pop one up), but all the keyboard shortcuts below still work.
 - Tabs: `+` or **Ctrl+T** opens a tab, **Ctrl+W** or middle-click closes one, **Ctrl+Shift+T** reopens the last closed tab, and **Ctrl+Tab** / **Ctrl+Shift+Tab** switches between them.
 - Drag a tab along the tab strip to reorder it; the other tabs slide out of the way.
 - Right-click a tab for more options: *New tab to the right*, *Duplicate*, *Pin* (pinned tabs shrink to an icon and stay on the left), *Close other tabs*, *Close tabs to the right* and *Reopen closed tab*.
@@ -56,7 +57,7 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 - **Dashboard**: a *This week* strip (Monday to Sunday with each day's progress, stamps on completed days and deadline flags; click a day to open it), today's plans and lessons, *Up next* (the next lesson and plan with a countdown), your *Deadlines*, the next 7 days, *Your progress* (streak of completed days, plans done this week and this month, lessons attended), *Unfinished* plans from recent days (with **Move to today**), a two-week history for each routine, and your categories as tiles.
 - **Calendar**: a month grid that grows with the window. Each day shows one dot per plan (in its category color) and a done/total count, and completed days get a green stamp. Click a day to see it in the panel beside the calendar, where its plans stay in time order (checking one crosses it out in place, so nothing jumps). From there you can check off plans, add plans and complete the whole day without leaving the page. You can also drag a plan onto another day to move it there. Days with a deadline show a small flag. Double-click a day to open it in the Day Planner. A **This month** bar along the bottom shows days completed, the share of plans done, your longest streak of completed days and your busiest day.
 - **Day Planner**: an *All day* section plus 24 hourly slots on one scrolling page. It opens at the top; on today, **Now** scrolls to the current hour. Plans at the same time sit side by side, and a plan that starts between hours (say 03:05) gets its own 03:05 line under 03:00. Click a slot (or **+ New plan**) to schedule something at that time. A *Due soon* bar at the top lists deadlines still ahead. Drag plans between hours or into *All day* to move them. While dragging you can scroll with the mouse wheel, and the page also scrolls by itself near the top or bottom edge.
-- **Week**: Monday to Sunday side by side with an hour scale. It shows your lessons and plans as blocks sized by how long they take. Click an empty slot to add a plan there, or drag a plan to another day or hour.
+- **Week**: Monday to Sunday side by side with all 24 hours. It opens scrolled to 07:00 (or your earliest plan), and the week navigation and day headers stay at the top while you scroll. It shows your lessons and plans as blocks sized by how long they take. Click an empty slot to add a plan there, or drag a plan to another day or hour.
 - **Timetable**: your weekly school (or work) schedule, set up once. See [Timetable](#timetable) below.
 - **History**: a compact record of your past days. Each day is one line (✓ done · ✗ missed); click it to see exactly which plans were done and which weren't. Filter to days with missed plans or days where everything was done, and load older days as needed.
 - **Settings**: theme, reminders, backups and where your data is stored.
@@ -85,9 +86,10 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 - When editing, moving or deleting a repeating plan, you choose between *only this day* and *all occurrences*.
 
 **Deadlines**: for things that must be done *by* a day rather than *on* it, such as homework. Right-click a day in the Calendar or Week view and choose **Add deadline…**, use **Add deadline** in the Calendar's day panel, or **+ Add deadline** on the Dashboard. A deadline has a title, a due date, an optional time, a category and notes, and you can edit or move it at any time.
-- The Dashboard lists open deadlines with a countdown (*Due in 3 days*, *Due tomorrow*, *Overdue by 1 day*), colored as the date gets close.
-- It shows in the Day Planner's *Due soon* bar every day until it's due, as a flag on its day in the Calendar, Week view and This-week strip, and in its category's page.
-- Check it off when you're done; Ctrl+Z brings it back.
+- Every deadline shows how long is left: *3 days left*, *Tomorrow*, *Today* or *2 days late*, colored as the date gets close.
+- The Dashboard lists your deadlines. Checking one off crosses it out but keeps it there until its day is over, so a misclick is one click to undo; older finished ones are under *Done* at the bottom of the card.
+- It shows in the Day Planner's *Due soon* bar every day until it's due, and on the day itself it's listed in that day's *All day* section.
+- In the Calendar, Week view and This-week strip its day gets a red flag, which turns green once it's done. The Calendar's day panel lists finished deadlines separately under *Finished*.
 - With reminders on, you get a notification the day before and on the day it's due.
 
 ### Timetable

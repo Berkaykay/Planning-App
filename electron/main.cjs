@@ -9,6 +9,8 @@ const dataDir = process.env.PLANNER_DATA_DIR || app.getPath('userData');
 const storage = createStorage(dataDir);
 
 let mainWindow = null;
+// Height of the tab strip, which doubles as the window's title bar.
+const TITLE_BAR_HEIGHT = 40;
 
 function sendCommand(command) {
   if (mainWindow) mainWindow.webContents.send('app:command', command);
@@ -81,8 +83,21 @@ function createWindow() {
     minWidth: 820,
     minHeight: 560,
     title: 'Planner',
+    icon: path.join(__dirname, 'icon.png'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#121316' : '#f4f4f5',
-    autoHideMenuBar: true,
+    // Browser-style frame: the tab strip is the top of the window. On Windows and Linux Electron
+    // draws the minimize / maximize / close buttons over its right end (colored to match the theme
+    // by the page, see 'window:titleBarOverlay'); on macOS the traffic lights sit at its left.
+    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
+    ...(isMac
+      ? {}
+      : {
+          titleBarOverlay: {
+            color: nativeTheme.shouldUseDarkColors ? '#0c0d0f' : '#e6e6ea',
+            symbolColor: nativeTheme.shouldUseDarkColors ? '#ececf0' : '#18181b',
+            height: TITLE_BAR_HEIGHT,
+          },
+        }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -90,6 +105,9 @@ function createWindow() {
       sandbox: true,
     },
   });
+
+  // No menu bar (not even when Alt is pressed); its keyboard shortcuts keep working.
+  mainWindow.setMenuBarVisibility(false);
 
   // This is not a web browser: never navigate the window away from the app,
   // and send any real web links to the system browser instead.
@@ -125,6 +143,16 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+// The page tells us its tab-strip colors so the window buttons match the light or dark theme.
+ipcMain.on('window:titleBarOverlay', (_event, { color, symbolColor }) => {
+  if (!mainWindow || isMac) return;
+  try {
+    mainWindow.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR_HEIGHT });
+  } catch (err) {
+    console.error('Could not recolor the window buttons', err);
+  }
+});
 
 ipcMain.handle('store:load', () => storage.load());
 ipcMain.handle('store:save', (_event, data) => {

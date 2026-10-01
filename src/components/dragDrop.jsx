@@ -59,7 +59,8 @@ export function DragProvider({ onDrop, children }) {
     }
   };
 
-  // Scrolls the page while the pointer is near its top or bottom edge.
+  // Scrolls the page while the pointer is near its top or bottom edge. A plan picked up close to an
+  // edge doesn't scroll the page until the pointer actually moves toward that edge.
   const autoScroll = () => {
     const s = session.current;
     if (!s) return;
@@ -67,8 +68,8 @@ export function DragProvider({ onDrop, children }) {
     if (page && s.active) {
       const rect = page.getBoundingClientRect();
       let dy = 0;
-      if (s.y < rect.top + EDGE) dy = -MAX_SPEED * Math.min(1, (rect.top + EDGE - s.y) / EDGE);
-      else if (s.y > rect.bottom - EDGE) dy = MAX_SPEED * Math.min(1, (s.y - (rect.bottom - EDGE)) / EDGE);
+      if (s.y < rect.top + EDGE && s.y < s.startY - THRESHOLD) dy = -MAX_SPEED * Math.min(1, (rect.top + EDGE - s.y) / EDGE);
+      else if (s.y > rect.bottom - EDGE && s.y > s.startY + THRESHOLD) dy = MAX_SPEED * Math.min(1, (s.y - (rect.bottom - EDGE)) / EDGE);
       if (dy) {
         page.scrollTop += dy;
         findTarget();
