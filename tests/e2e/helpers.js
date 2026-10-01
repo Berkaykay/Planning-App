@@ -10,8 +10,8 @@ export function tempDataDir() {
 // Launches the real Electron app with its data stored in `dataDir`.
 export async function launchApp(dataDir) {
   const args = ['.'];
-  // Chromium refuses to run sandboxed as root (e.g. in CI containers).
-  if (process.getuid?.() === 0) args.push('--no-sandbox');
+  // Chromium's sandbox is unavailable when running as root or on CI runners.
+  if (process.getuid?.() === 0 || process.env.CI) args.push('--no-sandbox');
   const app = await electron.launch({ args, env: { ...process.env, PLANNER_DATA_DIR: dataDir } });
   const page = await app.firstWindow();
   await page.waitForSelector('.app');

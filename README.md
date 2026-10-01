@@ -6,16 +6,39 @@ Built with **Electron + React** (bundled by Vite). All data is saved locally in 
 
 ![Dashboard](docs/dashboard.png)
 
-## Launching the app
+## Download and install
+
+1. Open the **[Releases page](https://github.com/Berkaykay/Planning-App/releases/latest)**. On the repository's main page it's under **Releases** on the right.
+2. Under **Assets**, download the file for your computer:
+
+| Your computer | File to download |
+| --- | --- |
+| Windows | `Planner-Setup-<version>.exe` (installs the app), or `Planner-Portable-<version>.exe` (runs without installing) |
+| Mac with Apple Silicon (M1/M2/M3/M4) | `Planner-<version>-mac-arm64.dmg` |
+| Mac with Intel processor | `Planner-<version>-mac-x64.dmg` |
+| Linux | `Planner-<version>-linux.AppImage` |
+
+3. Open it:
+   - **Windows:** double-click the Setup file. It installs in a few seconds and adds a **Planner** shortcut to your desktop and Start menu. The app isn't code-signed, so Windows may show *"Windows protected your PC"*: click **More info** → **Run anyway**.
+   - **macOS:** open the `.dmg` and drag **Planner** into **Applications**. The first time you open it, macOS will say it can't verify the developer. Click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway**. If macOS says the app *"is damaged"*, run `xattr -cr /Applications/Planner.app` in Terminal and open it again.
+   - **Linux:** make the file executable (`chmod +x Planner-*.AppImage`) and run it. On Ubuntu 22.04 and newer, if it doesn't start, install FUSE (`sudo apt install libfuse2t64`, or `libfuse2` on 22.04) or start it with `--no-sandbox`.
+
+Your plans are kept when you update: installing a newer version replaces the app but not your data (see [Where your data is stored](#where-your-data-is-stored)).
+
+### Run from source (for developers)
 
 Requirements: [Node.js](https://nodejs.org/) 20 or newer (includes `npm`).
 
 ```bash
 npm install     # first time only; downloads Electron
 npm start       # builds the UI and opens the app window
+npm run dev     # same, with instant reload of UI changes
+npm run dist    # builds an installer for your OS into release/
 ```
 
-For development, `npm run dev` opens the app against a Vite dev server so UI changes reload instantly.
+### How releases are made
+
+The [Build installers](.github/workflows/build.yml) GitHub Action builds and tests the Windows, macOS and Linux versions on every push. On pushes to `main`, it also publishes them on the Releases page as version `v<version>` from `package.json`. To publish a new version, raise `"version"` in `package.json` (for example `1.0.0` → `1.1.0`) and push to `main`. If you push without changing the version, the files in the existing release are replaced.
 
 ## Features
 

@@ -1,0 +1,74 @@
+name: Build installers
+
+# Every push builds the installers and runs the tests. Pushes to main also publish the
+# installers on the repository's Releases page as "v<version from package.json>".
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit
+      - name: End-to-end tests
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:e2e
+      - name: Build installers
+        run: npm run dist
+        env:
+          # No code-signing certificates are configured; build unsigned installers.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: planner-${{ runner.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Planner v${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: installers/*
+          body: |
+            Download the file for your computer:
+
+            - **Windows:** `Planner-Setup-${{ steps.version.outputs.version }}.exe` (installer) or `Planner-Portable-${{ steps.version.outputs.version }}.exe` (runs without installing)
+            - **macOS (Apple Silicon M1/M2/M3/M4):** `Planner-${{ steps.version.outputs.version }}-mac-arm64.dmg`
+            - **macOS (Intel):** `Planner-${{ steps.version.outputs.version }}-mac-x64.dmg`
+            - **Linux:** `Planner-${{ steps.version.outputs.version }}-linux.AppImage`
+
+            The app is not code-signed, so Windows and macOS show a warning the first time; see the README for how to open it.

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "productName": "Planner",
   "description": "A desktop planning app with browser-style tabs, categories, daily and hourly plans.",
+  "author": "Berkaykay",
   "main": "electron/main.cjs",
   "private": true,
   "type": "module",
@@ -12,16 +13,64 @@
     "dev": "node scripts/dev.mjs",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "node --test tests/unit/*.test.js",
-    "test:e2e": "vite build && playwright test"
-  },
-  "dependencies": {
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "test:e2e": "vite build && playwright test",
+    "dist": "vite build && electron-builder --publish never"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "vite": "^8.3.2"
+  },
+  "build": {
+    "appId": "com.berkaykay.planner",
+    "productName": "Planner",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "artifactName": "Planner-Setup-${version}.${ext}",
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true
+    },
+    "portable": {
+      "artifactName": "Planner-Portable-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "Planner-${version}-mac-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Office",
+      "artifactName": "Planner-${version}-linux.${ext}"
+    }
   }
 }
