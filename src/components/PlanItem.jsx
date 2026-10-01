@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../context.js';
 import { isDone, describeRepeat } from '../lib/recurrence.js';
-import { formatHour, relativeDayLabel } from '../lib/dates.js';
+import { formatTimeRange, relativeDayLabel } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import Check from './Check.jsx';
 import Link from './Link.jsx';
@@ -40,8 +40,13 @@ export default function PlanItem({ plan, date, showTime = true, showDate = false
               {relativeDayLabel(date, today)}
             </Link>
           )}
-          {showTime && <span>{plan.hour === null ? 'All day' : formatHour(plan.hour)}</span>}
-          {category && <span className="chip" style={{ '--chip': category.color }}>{category.name}</span>}
+          {showTime && <span className="plan-time">{formatTimeRange(plan)}</span>}
+          {category && (
+            <span className="chip">
+              <span className="dot" style={{ background: category.color }} />
+              {category.name}
+            </span>
+          )}
           {plan.repeat && <span title={describeRepeat(plan)}>↻ {describeRepeat(plan)}</span>}
           {plan.notes && <span className="plan-notes" title={plan.notes}>{plan.notes}</span>}
         </div>

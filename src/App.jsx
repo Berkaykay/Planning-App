@@ -13,6 +13,8 @@ import Calendar from './pages/Calendar.jsx';
 import DayPlanner from './pages/DayPlanner.jsx';
 import Categories from './pages/Categories.jsx';
 import CategoryPage from './pages/CategoryPage.jsx';
+import Timetable from './pages/Timetable.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 export default function App() {
@@ -46,6 +48,11 @@ function Planner({ initial }) {
   const today = useToday();
   const dialogs = useDialogState();
   const addressRef = useRef(null);
+
+  // Light / dark / follow-the-system theme (see the [data-theme] rules in styles.css).
+  useEffect(() => {
+    document.documentElement.dataset.theme = state.settings.theme;
+  }, [state.settings.theme]);
 
   // Save every change. Saves are processed in order by the main process.
   useEffect(() => {
@@ -163,6 +170,9 @@ function Planner({ initial }) {
     case 'categories':
       page = <Categories />;
       break;
+    case 'timetable':
+      page = <Timetable />;
+      break;
     case 'category':
       page = <CategoryPage id={route.id} />;
       break;
@@ -179,12 +189,37 @@ function Planner({ initial }) {
           <Sidebar />
           {/* Keyed by tab + history position so each page starts fresh, like a browser load. */}
           <main className="page" key={`${tab.id}:${tab.index}:${path}`} data-testid="page">
-            {page}
+            <ErrorBoundary
+              resetKey={path}
+              onBack={tab.index > 0 ? () => dispatch({ type: 'tab/back' }) : null}
+              onHome={() => navigate(paths.dashboard())}
+            >
+              {page}
+            </ErrorBoundary>
           </main>
         </div>
         {saveError && <div className="save-error">Could not save your changes: {saveError}</div>}
       </div>
-      <DialogHost dialogs={dialogs} />
+      <ErrorBoundary
+        resetKey={dialogs.current}
+        renderFallback={(error) => (
+          <div className="modal-backdrop">
+            <div className="modal modal-small" role="alertdialog" aria-label="Something went wrong">
+              <div className="modal-body">
+                <h2>Something went wrong</h2>
+                <p className="subtle">{String(error.message || error)}</p>
+              </div>
+              <footer className="modal-footer">
+                <button className="primary" onClick={() => dialogs.current?.close(null)}>
+                  Close
+                </button>
+              </footer>
+            </div>
+          </div>
+        )}
+      >
+        <DialogHost dialogs={dialogs} />
+      </ErrorBoundary>
     </AppContext.Provider>
   );
 }

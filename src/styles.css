@@ -1,44 +1,78 @@
-:root {
-  --bg: #f5f6f8;
+/* ---------- Theme tokens ----------
+   A calm, neutral palette: grey surfaces in clear steps, one blue accent, and green only for
+   "done". Category colors appear only as small dots and thin markers. */
+
+:root,
+:root[data-theme='light'] {
+  --bg: #f4f4f5;
   --surface: #ffffff;
-  --surface-2: #eef0f4;
-  --chrome: #dfe3ea;
-  --chrome-tab: #eceff4;
-  --text: #1c2230;
-  --muted: #687185;
-  --line: #dde1e8;
-  --muted-line: #c3c9d4;
-  --accent: #4f7cff;
-  --accent-soft: #e6edff;
-  --success: #22a06b;
-  --success-soft: #e3f5ec;
-  --danger: #e5484d;
-  --danger-soft: #fde8e8;
-  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
-  --radius: 8px;
+  --surface-2: #f1f1f3;
+  --chrome: #e6e6ea;
+  --chrome-tab: #eeeef1;
+  --text: #18181b;
+  --muted: #6b6b76;
+  --line: #e2e2e7;
+  --line-strong: #cfcfd6;
+  --accent: #3a6ae0;
+  --accent-text: #2f5bc8;
+  --accent-soft: #eaf0fd;
+  --success: #2f8f5f;
+  --success-soft: #e7f3ec;
+  --danger: #c9483f;
+  --danger-soft: #fbecea;
+  --shadow: 0 1px 2px rgb(24 24 27 / 5%);
+  --overlay: rgb(24 24 27 / 40%);
   color-scheme: light;
 }
 
+:root[data-theme='dark'] {
+  --bg: #121316;
+  --surface: #1a1b1f;
+  --surface-2: #24252a;
+  --chrome: #0c0d0f;
+  --chrome-tab: #16171a;
+  --text: #ececf0;
+  --muted: #9b9ca6;
+  --line: #2b2c32;
+  --line-strong: #3b3c44;
+  --accent: #7aa2ff;
+  --accent-text: #8fb1ff;
+  --accent-soft: #1e2840;
+  --success: #4fbf86;
+  --success-soft: #182a20;
+  --danger: #f07a70;
+  --danger-soft: #3a1f1d;
+  --shadow: none;
+  --overlay: rgb(0 0 0 / 55%);
+  color-scheme: dark;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #15181e;
-    --surface: #1d2129;
-    --surface-2: #252a34;
-    --chrome: #0f1115;
-    --chrome-tab: #1a1d24;
-    --text: #e6e9ef;
-    --muted: #949cad;
-    --line: #2d333f;
-    --muted-line: #4a5263;
-    --accent: #6b8fff;
-    --accent-soft: #24304f;
-    --success: #3cc98a;
-    --success-soft: #1b3329;
-    --danger: #ff6b6f;
-    --danger-soft: #3a1f22;
-    --shadow: 0 1px 2px rgb(0 0 0 / 40%);
+  :root[data-theme='system'] {
+    --bg: #121316;
+    --surface: #1a1b1f;
+    --surface-2: #24252a;
+    --chrome: #0c0d0f;
+    --chrome-tab: #16171a;
+    --text: #ececf0;
+    --muted: #9b9ca6;
+    --line: #2b2c32;
+    --line-strong: #3b3c44;
+    --accent: #7aa2ff;
+    --accent-text: #8fb1ff;
+    --accent-soft: #1e2840;
+    --success: #4fbf86;
+    --success-soft: #182a20;
+    --danger: #f07a70;
+    --danger-soft: #3a1f1d;
+    --shadow: none;
+    --overlay: rgb(0 0 0 / 55%);
     color-scheme: dark;
   }
+}
+
+:root {
+  --radius: 8px;
 }
 
 * {
@@ -63,6 +97,7 @@ h1,
 h2 {
   margin: 0;
   font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 h1 {
@@ -79,12 +114,14 @@ code {
   border-radius: 4px;
 }
 
+/* ---------- Controls ---------- */
+
 button,
 .button {
   font: inherit;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
   padding: 5px 12px;
   cursor: pointer;
@@ -101,7 +138,7 @@ button:hover:not(:disabled),
 }
 
 button:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: default;
 }
 
@@ -109,13 +146,25 @@ button.primary,
 .button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: #fff;
+}
+
+:root[data-theme='dark'] button.primary,
+:root[data-theme='dark'] .button.primary {
+  color: #0c1222;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] button.primary,
+  :root[data-theme='system'] .button.primary {
+    color: #0c1222;
+  }
 }
 
 button.primary:hover:not(:disabled),
 .button.primary:hover {
-  filter: brightness(1.08);
   background: var(--accent);
+  filter: brightness(1.07);
 }
 
 button.danger {
@@ -125,12 +174,12 @@ button.danger {
 button.primary.danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: white;
+  color: #fff;
 }
 
 .button.current {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .icon-button {
@@ -151,6 +200,12 @@ button.primary.danger {
   background: none;
   padding: 0;
   font-weight: 600;
+  color: var(--accent-text);
+}
+
+.link-button:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
 }
 
 input,
@@ -159,9 +214,15 @@ textarea {
   font: inherit;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
   padding: 6px 8px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
 }
 
 input:focus,
@@ -190,7 +251,6 @@ a.link {
 
 .empty {
   color: var(--muted);
-  font-style: italic;
 }
 
 .splash {
@@ -198,6 +258,17 @@ a.link {
   place-items: center;
   height: 100%;
   color: var(--muted);
+}
+
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.spacer {
+  flex: 1;
 }
 
 /* ---------- App frame ---------- */
@@ -220,6 +291,7 @@ a.link {
 }
 
 .tab {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -241,7 +313,26 @@ a.link {
 .tab.active {
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 -1px 2px rgb(0 0 0 / 6%);
+}
+
+/* Where a dragged tab will land. */
+.tab.insert-before::before,
+.tab.insert-after::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.tab.insert-before::before {
+  left: -3px;
+}
+
+.tab.insert-after::after {
+  right: -3px;
 }
 
 .tab-icon {
@@ -327,14 +418,14 @@ a.link {
 
 .save-error {
   background: var(--danger);
-  color: white;
+  color: #fff;
   padding: 6px 12px;
 }
 
 /* ---------- Sidebar ---------- */
 
 .sidebar {
-  width: 230px;
+  width: 220px;
   flex-shrink: 0;
   background: var(--surface);
   border-right: 1px solid var(--line);
@@ -376,7 +467,7 @@ a.link {
 .side-item.active,
 .category-row.selected .side-item {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 
@@ -413,9 +504,7 @@ a.link {
 .count {
   font-size: 12px;
   color: var(--muted);
-  background: var(--surface-2);
-  border-radius: 999px;
-  padding: 0 7px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Rename/delete appear over the count on hover or keyboard focus. */
@@ -439,20 +528,16 @@ a.link {
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
 }
 
 .dot.big {
-  width: 16px;
-  height: 16px;
-}
-
-.dot-empty {
-  border: 1.5px solid var(--muted-line);
+  width: 14px;
+  height: 14px;
 }
 
 .category-input {
@@ -471,12 +556,40 @@ a.link {
   margin-top: 2px;
 }
 
+.theme-section {
+  margin-top: auto;
+}
+
+.segmented {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: 7px;
+  padding: 2px;
+  margin: 0 4px;
+}
+
+.segmented button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  justify-content: center;
+  padding: 4px 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.segmented button.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
 /* ---------- Common page pieces ---------- */
 
 .page-header {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 18px;
 }
 
@@ -531,7 +644,7 @@ a.link {
 .card-link {
   margin-left: auto;
   font-size: 13px;
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -548,17 +661,28 @@ a.link {
   font-weight: 600;
 }
 
+.badge a {
+  color: inherit;
+}
+
 .chip {
-  color: var(--chip);
-  border: 1px solid color-mix(in srgb, var(--chip) 40%, transparent);
-  background: color-mix(in srgb, var(--chip) 12%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  background: var(--surface-2);
   border-radius: 999px;
-  padding: 0 7px;
+  padding: 0 8px 0 6px;
   font-size: 11.5px;
 }
 
-.progress {
+.chip .dot {
+  width: 6px;
   height: 6px;
+}
+
+.progress {
+  height: 4px;
   background: var(--surface-2);
   border-radius: 999px;
   overflow: hidden;
@@ -594,7 +718,7 @@ a.link {
   height: 20px;
   padding: 0;
   border-radius: 50%;
-  border: 2px solid var(--muted-line);
+  border: 1.5px solid var(--line-strong);
   background: var(--surface);
   display: inline-grid;
   place-items: center;
@@ -606,7 +730,7 @@ a.link {
   width: 12px;
   height: 12px;
   fill: none;
-  stroke: white;
+  stroke: #fff;
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -619,7 +743,7 @@ a.link {
 }
 
 .check:hover svg {
-  opacity: 0.5;
+  opacity: 0.6;
   stroke: var(--success);
 }
 
@@ -631,23 +755,22 @@ a.link {
 
 .check.checked svg {
   opacity: 1;
-  stroke: white;
+  stroke: var(--surface);
 }
 
 .check-large {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
 }
 
 .check-large svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .check-small {
   width: 16px;
   height: 16px;
-  border-width: 1.5px;
 }
 
 .check-small svg {
@@ -669,7 +792,7 @@ a.link {
   gap: 10px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--cat);
+  border-left: 3px solid var(--cat);
   border-radius: 6px;
   padding: 8px 8px 8px 10px;
   cursor: grab;
@@ -698,8 +821,14 @@ a.link {
   align-items: center;
 }
 
+.plan-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  opacity: 0.8;
+}
+
 .meta-link {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
   font-weight: 600;
 }
@@ -725,16 +854,16 @@ a.link {
 
 /* Completed items are crossed out. */
 .plan.done .plan-title,
-.cell-plans li.done,
 .day-done .day-heading {
   text-decoration: line-through;
-  text-decoration-thickness: 2px;
+  text-decoration-thickness: 1.5px;
   color: var(--muted);
 }
 
 .plan.done {
   background: var(--surface-2);
-  opacity: 0.85;
+  border-color: transparent;
+  border-left-color: var(--line-strong);
 }
 
 .quick-add {
@@ -821,7 +950,7 @@ a.link {
 }
 
 .hour-row.now .hour-label {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -867,78 +996,115 @@ a.link {
 
 /* ---------- Calendar ---------- */
 
+.calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 580px) minmax(300px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1050px) {
+  .calendar-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: var(--line);
-  gap: 1px;
+  gap: 4px;
 }
 
 .weekday-head {
-  background: var(--surface-2);
-  padding: 6px 8px;
-  font-size: 12px;
+  padding: 2px 6px 4px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .calendar-cell {
   background: var(--surface);
-  min-height: 108px;
-  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  height: 68px;
+  padding: 6px 7px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: space-between;
   min-width: 0;
+  user-select: none;
 }
 
 .calendar-cell:hover {
-  background: var(--surface-2);
+  border-color: var(--line-strong);
 }
 
 .calendar-cell.outside {
-  background: var(--bg);
+  background: transparent;
+  border-color: transparent;
 }
 
 .calendar-cell.outside .cell-day {
   color: var(--muted);
+  opacity: 0.6;
 }
 
-.calendar-cell.today .cell-day {
-  background: var(--accent);
-  color: white;
-  border-radius: 999px;
-  padding: 0 7px;
+.calendar-cell.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .calendar-cell.day-done {
   background: var(--success-soft);
 }
 
-.calendar-cell.day-done .cell-day {
-  text-decoration: line-through;
-  text-decoration-thickness: 2px;
-}
-
 .cell-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
 }
 
 .cell-day {
   font-weight: 600;
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+}
+
+.calendar-cell.today .cell-day {
+  background: var(--accent);
+  color: var(--surface);
+  border-radius: 999px;
+  min-width: 22px;
+  text-align: center;
+  padding: 0 6px;
+}
+
+.cell-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+  min-height: 6px;
+}
+
+.cell-dots .dot {
+  width: 6px;
+  height: 6px;
+}
+
+.cell-dots .dot-done {
+  opacity: 0.35;
 }
 
 .cell-count {
   font-size: 11px;
   color: var(--muted);
-  margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .cell-count.all-done {
@@ -946,41 +1112,56 @@ a.link {
   font-weight: 700;
 }
 
-.cell-head .check {
-  margin-left: auto;
+.calendar-side .card {
+  margin-bottom: 16px;
 }
 
-.cell-count + .check {
-  margin-left: 0;
-}
-
-.cell-plans {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 12px;
+.selected-title {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  min-width: 0;
 }
 
-.cell-plans li {
-  border-left: 3px solid var(--cat);
-  padding-left: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.selected-day.day-done {
+  background: color-mix(in srgb, var(--success-soft) 60%, var(--surface));
 }
 
-.cell-plans li.more {
-  border: none;
+.open-day {
+  margin-top: 12px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin: 4px 0 12px;
+}
+
+.stats div {
+  min-width: 0;
+}
+
+.stats dt {
+  font-size: 12px;
   color: var(--muted);
 }
 
-.cell-time {
-  color: var(--muted);
-  margin-right: 4px;
+.stats dd {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
+}
+
+.stats dd small {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.stats dd.busiest {
+  font-size: 15px;
+  line-height: 30px;
 }
 
 /* ---------- Dashboard ---------- */
@@ -1001,7 +1182,7 @@ a.link {
 }
 
 .today-card.day-done {
-  background: color-mix(in srgb, var(--success-soft) 70%, var(--surface));
+  background: color-mix(in srgb, var(--success-soft) 60%, var(--surface));
 }
 
 .upcoming,
@@ -1067,30 +1248,31 @@ a.link {
 }
 
 .tracker-day {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border-radius: 5px;
   font-size: 10px;
   justify-content: center;
   color: var(--muted);
+  border-color: var(--line);
 }
 
 .tracker-day.off {
   background: transparent;
   border-style: dashed;
-  opacity: 0.35;
+  opacity: 0.4;
 }
 
 .tracker-day.hit {
   background: var(--success);
   border-color: var(--success);
-  color: white;
+  color: var(--surface);
 }
 
 .tracker-day.miss {
   background: var(--danger-soft);
-  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  border-color: transparent;
   color: var(--danger);
 }
 
@@ -1117,7 +1299,6 @@ a.link {
 }
 
 .category-card {
-  border-top: 4px solid var(--cat);
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -1126,6 +1307,17 @@ a.link {
 
 .category-card h2 {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-card h2::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--cat);
 }
 
 .category-card h2 a {
@@ -1143,11 +1335,11 @@ a.link {
 }
 
 .swatch {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: none;
 }
 
 .swatch.on {
@@ -1160,12 +1352,106 @@ a.link {
   gap: 10px;
 }
 
+/* ---------- Timetable ---------- */
+
+.timetable-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: flex-end;
+}
+
+.timetable-settings .field {
+  flex: 1 1 160px;
+}
+
+.timetable-settings .saturday {
+  padding-bottom: 7px;
+}
+
+.timetable-card {
+  overflow-x: auto;
+}
+
+.timetable-grid {
+  border-collapse: separate;
+  border-spacing: 4px;
+  width: 100%;
+  min-width: 720px;
+}
+
+.timetable-grid th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 2px 2px;
+}
+
+.timetable-grid .period-head {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.period-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.period-cell input {
+  padding: 5px 6px;
+  width: 112px;
+  font-variant-numeric: tabular-nums;
+}
+
+.period-number {
+  width: 18px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+  margin-right: 2px;
+}
+
+.subject-input {
+  width: 100%;
+  min-width: 90px;
+  background: var(--surface-2);
+  border-color: transparent;
+}
+
+.subject-input:not(:placeholder-shown) {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  font-weight: 550;
+}
+
+.add-lesson {
+  margin: 8px 0 0 4px;
+}
+
+.timetable-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 /* ---------- Dialogs and forms ---------- */
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(10 14 22 / 45%);
+  background: var(--overlay);
   display: grid;
   place-items: center;
   z-index: 100;
@@ -1174,11 +1460,12 @@ a.link {
 
 .modal {
   background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 12px;
   width: min(560px, 100%);
   max-height: 100%;
   overflow: auto;
-  box-shadow: 0 20px 50px rgb(0 0 0 / 30%);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 25%);
 }
 
 .modal-small {
@@ -1235,6 +1522,17 @@ a.link {
   flex-wrap: wrap;
 }
 
+.time-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.time-inputs input[type='time'] {
+  width: 110px;
+}
+
 .scope {
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -1275,7 +1573,7 @@ a.link {
 .weekday-picker button.on {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--surface);
 }
 
 .form-error {

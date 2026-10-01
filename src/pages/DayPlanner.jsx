@@ -105,7 +105,7 @@ export default function DayPlanner({ date }) {
               <div className="hour-label">{formatHour(hour)}</div>
               <div className="hour-plans" onClick={(e) => e.target === e.currentTarget && actions.create({ date, hour })}>
                 {items.map((p) => (
-                  <PlanItem key={p.id} plan={p} date={date} showTime={false} />
+                  <PlanItem key={p.id} plan={p} date={date} />
                 ))}
                 <button
                   className="hour-add"

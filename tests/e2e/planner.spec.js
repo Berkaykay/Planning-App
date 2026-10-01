@@ -62,12 +62,15 @@ test('create, rename, select and delete categories from the sidebar', async () =
   await expect(plan('Read chapter 3')).toContainText('Learning');
 
   await sidebar().getByRole('button', { name: 'Delete Learning' }).click();
-  await expect(dialog()).toContainText('1 plan will be kept as uncategorized');
+  await expect(dialog()).toContainText('1 plan will be kept, without a category');
   await dialog().getByRole('button', { name: 'Delete' }).click();
   await expect(sidebar().getByRole('link', { name: /Learning/ })).toHaveCount(0);
   await expect(page.getByTestId('page').getByRole('heading', { level: 1 })).toHaveText('Categories');
-  await sidebar().getByRole('link', { name: /Uncategorized/ }).click();
+  // There is no "Uncategorized" entry; the plan simply has no category now.
+  await expect(sidebar().getByText('Uncategorized')).toHaveCount(0);
+  await sidebar().getByRole('link', { name: 'Dashboard' }).click();
   await expect(plan('Read chapter 3')).toBeVisible();
+  await expect(plan('Read chapter 3').locator('.chip')).toHaveCount(0);
 });
 
 test('daily and hourly plans: add, complete, undo, edit, move and delete', async () => {
@@ -80,7 +83,8 @@ test('daily and hourly plans: add, complete, undo, edit, move and delete', async
 
   // Hourly plan with a category via the dialog.
   await page.getByRole('button', { name: 'Add plan at 09:00' }).click();
-  await expect(dialog().getByLabel('Time')).toHaveValue('9');
+  await expect(dialog().getByLabel('All day')).not.toBeChecked();
+  await expect(dialog().getByLabel('Start time')).toHaveValue('09:00');
   await dialog().getByLabel('Title').fill('Team standup');
   await dialog().getByLabel('Notes').click();
   await page.keyboard.type('Room 4');
@@ -104,14 +108,18 @@ test('daily and hourly plans: add, complete, undo, edit, move and delete', async
   // Edit: rename and reschedule to 14:00.
   await page.getByRole('button', { name: 'Edit "Team standup"' }).click();
   await dialog().getByLabel('Title').fill('Team sync');
-  await dialog().getByLabel('Time').selectOption({ label: '14:00' });
+  await dialog().getByLabel('Start time').fill('14:15');
+  await dialog().getByLabel('End time').fill('15:00');
   await dialog().getByRole('button', { name: 'Save' }).click();
   await expect(page.getByTestId('hour-14').getByTestId('plan')).toContainText('Team sync');
+  await expect(page.getByTestId('hour-14').getByTestId('plan')).toContainText('14:15–15:00');
   await expect(page.getByTestId('hour-9').getByTestId('plan')).toHaveCount(0);
 
   // Drag and drop to another hour, and from the all-day section into an hour.
   await plan('Team sync').dragTo(page.getByTestId('hour-16'));
   await expect(page.getByTestId('hour-16').getByTestId('plan')).toContainText('Team sync');
+  // Dragging keeps the minutes and the length.
+  await expect(page.getByTestId('hour-16').getByTestId('plan')).toContainText('16:15–17:00');
   await plan('Plan the week').dragTo(page.getByTestId('hour-8'));
   await expect(page.getByTestId('hour-8').getByTestId('plan')).toContainText('Plan the week');
 
@@ -165,7 +173,8 @@ test('repeating plans get a fresh check mark each day and keep history', async (
   await openToday();
   await page.getByRole('button', { name: '+ New plan' }).click();
   await dialog().getByLabel('Title').fill('Meditate');
-  await dialog().getByLabel('Time').selectOption({ label: '07:00' });
+  await dialog().getByLabel('All day').uncheck();
+  await dialog().getByLabel('Start time').fill('07:00');
   await dialog().getByLabel('Repeat').selectOption('daily');
   await expect(dialog()).toContainText('Every day');
   await dialog().getByRole('button', { name: 'Add plan' }).click();
@@ -199,7 +208,7 @@ test('repeating plans get a fresh check mark each day and keep history', async (
   await openToday();
   await page.getByRole('button', { name: 'Edit "Meditate"' }).click();
   await dialog().getByLabel(/^Only /).check();
-  await dialog().getByLabel('Time').selectOption({ label: '18:00' });
+  await dialog().getByLabel('Start time').fill('18:00');
   await dialog().getByRole('button', { name: 'Save' }).click();
   await expect(page.getByTestId('hour-18').getByTestId('plan')).toContainText('Meditate');
   await expect(check('Meditate')).toHaveAttribute('aria-checked', 'true');

@@ -65,6 +65,25 @@ export function formatMonth(monthKey) {
 }
 
 export const formatHour = (hour) => `${pad(hour)}:00`;
+export const formatTime = (hour, minute = 0) => `${pad(hour)}:${pad(minute)}`;
+
+// "08:30" -> 510 (minutes after midnight); null when not a valid time.
+export function parseTime(text) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(text ?? '').trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  return h > 23 || min > 59 ? null : h * 60 + min;
+}
+
+export const minutesToTime = (total) => formatTime(Math.floor(total / 60) % 24, total % 60);
+
+// "All day", "08:30" or "08:30–09:10" for a plan.
+export function formatTimeRange(plan) {
+  if (plan.hour === null) return 'All day';
+  const start = plan.hour * 60 + (plan.minute ?? 0);
+  return plan.duration ? `${minutesToTime(start)}–${minutesToTime(start + plan.duration)}` : minutesToTime(start);
+}
 
 export function relativeDayLabel(key, today = todayKey()) {
   if (key === today) return 'Today';

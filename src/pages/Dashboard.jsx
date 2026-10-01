@@ -22,7 +22,10 @@ export default function Dashboard() {
   const todays = plansOn(state.plans, today);
   const done = todays.filter((p) => isDone(p, today)).length;
   const dayDone = Boolean(state.days[today]?.done);
-  const repeating = state.plans.filter((p) => p.repeat && (!p.repeat.until || p.repeat.until >= today) && p.date <= today);
+  // Timetable lessons are tracked on the Timetable/Calendar pages; listing every lesson here would crowd the dashboard.
+  const repeating = state.plans.filter(
+    (p) => p.repeat && !p.timetableId && (!p.repeat.until || p.repeat.until >= today) && p.date <= today,
+  );
   const upcoming = Array.from({ length: 7 }, (_, i) => addDays(today, i + 1));
 
   return (
@@ -93,7 +96,7 @@ export default function Dashboard() {
           {repeating.length === 0 ? (
             <p className="empty">
               No repeating plans yet. Set <strong>Repeat</strong> to daily, weekly or monthly when creating a plan to track
-              routines.
+              routines, or fill in the <Link to={paths.timetable()}>Timetable</Link> for your weekly school lessons.
             </p>
           ) : (
             repeating.map((p) => <RepeatTracker key={p.id} plan={p} />)

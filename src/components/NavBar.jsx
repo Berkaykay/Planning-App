@@ -23,8 +23,8 @@ export default function NavBar({ addressRef }) {
   // "New plan" pre-fills the date/category of the page you are on.
   const newPlan = () =>
     actions.create({
-      date: route.page === 'day' ? route.date : undefined,
-      categoryId: route.page === 'category' && route.id !== 'none' ? route.id : null,
+      ...(route.page === 'day' && { date: route.date }),
+      ...(route.page === 'category' && { categoryId: route.id }),
     });
 
   return (
