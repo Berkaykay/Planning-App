@@ -60,6 +60,7 @@ export default function Week({ start }) {
       { label: 'Mark attended', checked: attended, onSelect: () => dispatch({ type: 'lesson/setAttended', id: p.id, date, attended: true }) },
       { label: 'Mark absent', checked: !attended, onSelect: () => dispatch({ type: 'lesson/setAttended', id: p.id, date, attended: false }) },
       null,
+      { label: 'Add homework…', onSelect: () => deadlineActions.homework(p, date) },
       { label: 'Open Timetable', onSelect: () => navigate(paths.timetable()) },
     ]);
 

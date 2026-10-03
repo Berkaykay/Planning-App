@@ -13,17 +13,16 @@ Built with **Electron + React** (bundled by Vite). All data is saved locally in 
 
 | Your computer | File to download |
 | --- | --- |
-| Windows | `Planner-Setup-<version>.exe` (installs the app), or `Planner-Portable-<version>.exe` (runs without installing) |
-| Mac with Apple Silicon (M1/M2/M3/M4) | `Planner-<version>-mac-arm64.dmg` |
-| Mac with Intel processor | `Planner-<version>-mac-x64.dmg` |
-| Linux | `Planner-<version>-linux.AppImage` |
+| Windows 10 / 11 | `Planner-Setup-<version>.exe` |
+| Linux (Nobara, Fedora, Ubuntu…) | `Planner-<version>-linux.AppImage` |
+
+(The `latest*.yml` and `.blockmap` files are for the in-app updater; you don't need them.)
 
 3. Open it:
    - **Windows:** double-click the Setup file. It installs in a few seconds and adds a **Planner** shortcut to your desktop and Start menu. The app isn't code-signed, so Windows may show *"Windows protected your PC"*: click **More info** → **Run anyway**.
-   - **macOS:** open the `.dmg` and drag **Planner** into **Applications**. The first time you open it, macOS will say it can't verify the developer. Click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway**. If macOS says the app *"is damaged"*, run `xattr -cr /Applications/Planner.app` in Terminal and open it again.
-   - **Linux:** make the file executable (`chmod +x Planner-*.AppImage`) and run it. On Ubuntu 22.04 and newer, if it doesn't start, install FUSE (`sudo apt install libfuse2t64`, or `libfuse2` on 22.04) or start it with `--no-sandbox`.
+   - **Linux:** make the file executable (`chmod +x Planner-*.AppImage`) and run it. Planner then adds itself to your applications menu with its icon, so next time you can start it from there (and pin it to the taskbar). Keep the AppImage somewhere permanent, such as `~/Applications`; if you move it, Planner updates the menu entry the next time it starts. On Ubuntu 22.04 and newer, if it doesn't start, install FUSE (`sudo apt install libfuse2t64`, or `libfuse2` on 22.04) or start it with `--no-sandbox`.
 
-**Updating is automatic for your data:** your plans are stored separately from the app, so a new version picks them up as they are. Just replace the old file (or run the new installer). See [Where your data is stored](#where-your-data-is-stored).
+**Updates install themselves (from 1.5 on):** when a new version is out, a small **↑ 1.5.1**-style button appears at the top right of the window. Click it and choose **Update and restart**. Your plans are stored separately from the app, so they're kept as they are. See [Where your data is stored](#where-your-data-is-stored).
 
 ### Run from source (for developers)
 
@@ -38,7 +37,7 @@ npm run dist    # builds an installer for your OS into release/
 
 ### How releases are made
 
-The [Build installers](.github/workflows/build.yml) GitHub Action builds and tests the Windows, macOS and Linux versions on every push. On pushes to `main`, it also publishes them on the Releases page as version `v<version>` from `package.json`. To publish a new version, raise `"version"` in `package.json` (for example `1.0.0` → `1.1.0`) and push to `main`. If you push without changing the version, the files in the existing release are replaced.
+The [Build installers](.github/workflows/build.yml) GitHub Action builds and tests the Windows and Linux versions on every push. On pushes to `main`, it also publishes them on the Releases page as version `v<version>` from `package.json`, together with the `latest*.yml` files the in-app updater reads (so the repository's releases need to be public). To publish a new version, raise `"version"` in `package.json` (for example `1.0.0` → `1.1.0`) and push to `main`. If you push without changing the version, the files in the existing release are replaced.
 
 ## Features
 
@@ -47,7 +46,8 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 - Tabs: `+` or **Ctrl+T** opens a tab, **Ctrl+W** or middle-click closes one, **Ctrl+Shift+T** reopens the last closed tab, and **Ctrl+Tab** / **Ctrl+Shift+Tab** switches between them.
 - Drag a tab along the tab strip to reorder it; the other tabs slide out of the way.
 - Right-click a tab for more options: *New tab to the right*, *Duplicate*, *Pin* (pinned tabs shrink to an icon and stay on the left), *Close other tabs*, *Close tabs to the right* and *Reopen closed tab*.
-- Each tab has its own back/forward history. Use the ← → buttons, **Alt+←/→** (on macOS **Cmd+[ / ]**), or the mouse side buttons.
+- Each tab has its own back/forward history. Use the ← → buttons, **Alt+←/→**, or the mouse side buttons.
+- **Ctrl+K** opens **quick search**: type to find any page, category, plan or deadline (or type a date like `2026-10-12`), then **Enter** to open it or **Ctrl+Enter** to open it in a new tab.
 - The address bar shows the page you're on, such as `planner://day/2026-10-01`, and you can type an address to go there. Addresses: `planner://dashboard`, `planner://calendar/2026-10` (or `planner://calendar/2026-10-01` to select a day), `planner://day/today`, `planner://timetable`, `planner://categories`.
 - **Ctrl+click** or middle-click any link or calendar day to open it in a background tab.
 - **Ctrl+1–4** jump to Dashboard, Calendar, today's Day Planner and Categories. **Ctrl+L** focuses the address bar.
@@ -91,6 +91,8 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 - It shows in the Day Planner's *Due soon* bar every day until it's due, and on the day itself it's listed in that day's *All day* section.
 - In the Calendar, Week view and This-week strip its day gets a red flag, which turns green once it's done. The Calendar's day panel lists finished deadlines separately under *Finished*.
 - With reminders on, you get a notification the day before and on the day it's due.
+- **Homework for a lesson:** right-click a lesson and choose **Add homework…**, or press **+ Homework** in the Lessons strip. The deadline is filled in for you: due at the start of that subject's next lesson, in the lesson's category.
+- **Repeat weekly:** tick it for homework you get every week. When you check it off, next week's is added automatically.
 
 ### Timetable
 
@@ -107,14 +109,26 @@ Each filled cell becomes a weekly lesson in the *School* category, created autom
 **Right-click menus**:
 - **Plans:** done/not done, edit, duplicate, copy to tomorrow / to a date / to every day this week, move to today / tomorrow, change category, delete, undo.
 - **Calendar and week days:** open, open in a new tab, add a plan, add a deadline, mark the day complete.
-- **Lessons:** attended / absent.
+- **Lessons:** attended / absent, add homework.
 - **Categories in the sidebar:** open in a new tab, rename, customize, delete.
 - **Tabs:** see above.
 - **Text fields:** cut, copy, paste.
 
 **Undo**: **Ctrl+Z** undoes the last change to your plans, such as completing, deleting, moving or importing, and **Ctrl+Shift+Z** (or **Ctrl+Y**) redoes it. *Undo* is also in the right-click menus.
 
-**Reminders**: Planner shows a desktop notification 10 minutes before a timed plan starts, while the app is open. In **Settings** you can turn reminders off, change the timing, or include lessons.
+**Notifications**: a desktop notification before a timed plan starts (10 minutes by default) and for deadlines the day before and on the day. It shows the plan and its category, such as *Math prep — 🏫 Okul · 14:00 · starts in 10 min*. In **Settings → Notifications** you can:
+- choose how long before, and whether lessons get reminders too;
+- pick the sound (soft chime, bell, pop or none) and its volume, or **add your own sounds** (mp3, wav, ogg);
+- give each **category** its own sound and timing, or turn it off;
+- set **quiet hours** (for example 23:00–07:00) when nothing plays or pops up.
+
+**Tray and background** (Settings → Tray and background, all off by default):
+- **Show Planner in the system tray.** Click the tray icon for a small view of today: your progress, what's up next, today's plans to check off, lessons and deadlines, and a box to add a plan. Right-click it for *Open Planner* and *Quit*. On GNOME the tray needs the AppIndicator extension; KDE shows it directly.
+  <img src="docs/tray-popup.png" alt="Tray popup" width="300">
+- **Keep running when the window is closed**, so reminders and sounds keep working; open the window again from the tray.
+- **Start when I log in** (quietly into the tray).
+
+**Little celebrations**: confetti when you complete a whole day, a sparkle when you finish a deadline, and springy check marks. Everything calms down if your system asks for reduced motion.
 
 ## Where your data is stored
 
@@ -123,10 +137,10 @@ Everything is saved immediately after each change to `planner-data.json` in the 
 | OS      | Location                                        |
 | ------- | ----------------------------------------------- |
 | Windows | `%APPDATA%\Planner\planner-data.json`           |
-| macOS   | `~/Library/Application Support/Planner/planner-data.json` |
 | Linux   | `~/.config/Planner/planner-data.json`           |
 
 - **Updates keep your data:** the file lives outside the app, so new versions simply keep using it.
+- **Your sounds** are copied into the `sounds` folder next to the data file.
 - **Daily backups:** each day the app starts, it saves a copy in the `backups` folder next to the data file and keeps the last 7 days.
 - **Export/Import:** **Settings → Export backup…** saves everything to a file of your choice; **Import backup…** loads one back (and can be undone with Ctrl+Z).
 - **Safe with older versions:** if an older version of Planner opens data saved by a newer one, it shows it but doesn't overwrite it.
@@ -154,14 +168,17 @@ The end-to-end tests launch the actual app with a temporary data folder and cove
 - undo/redo, reminders, backup export/import, daily backups and the newer-version guard;
 - repeating plans: a fresh check mark each day, history, and one-day edits and deletes;
 - tabs (dragging, pinning, the right-click menu, reopening closed tabs), back/forward, the address bar and keyboard shortcuts;
-- persistence across closing and reopening the app, including the theme and tab order.
+- persistence across closing and reopening the app, including the theme and tab order;
+- quick search (Ctrl+K), homework from lessons and weekly deadlines, notifications with categories, sounds and quiet hours, the update button (against a local test server), the tray popup staying in step with the main window, keep-running and start-at-login, and the applications-menu entry.
 
 On a Linux machine without a display (for example CI), run them under a virtual display: `xvfb-run -a npm run test:e2e`.
 
 ## Project layout
 
 ```
-electron/        main process: window, menu/shortcuts, JSON storage (storage.cjs), preload bridge
+electron/        main process: window, menu/shortcuts, JSON storage (storage.cjs), preload bridge,
+                 tray + popup (tray.cjs), updates (updates.cjs), menu entry/autostart (launcher.cjs), sounds (sounds.cjs)
+src/mini/        the tray popup ("today at a glance")
 src/lib/         pure logic: dates, recurrence rules, routes, state reducer, undo history
 src/components/  tabs, nav bar, sidebar, plan item, dialogs, shared plan/category actions
 src/pages/       Dashboard, Calendar, DayPlanner, Week, Timetable, History, Categories, CategoryPage, Settings, NotFound

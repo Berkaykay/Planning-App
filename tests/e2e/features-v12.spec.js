@@ -267,7 +267,7 @@ test('reminders notify shortly before a timed plan starts', async () => {
   const hhmm = `${String(soon.getHours()).padStart(2, '0')}:${String(soon.getMinutes()).padStart(2, '0')}`;
   await dialog().getByLabel('Start time').fill(hhmm);
   await dialog().getByRole('button', { name: 'Add plan' }).click();
-  await expect.poll(() => page.evaluate(() => window.__notes)).toEqual([expect.stringMatching(/^Team call: Starts in [45] min/)]);
+  await expect.poll(() => page.evaluate(() => window.__notes)).toEqual([expect.stringMatching(/^Team call: \d\d:\d\d · starts in [45] min/)]);
 });
 
 test('backups: export, import, daily copies, and data from a newer version is protected', async () => {
