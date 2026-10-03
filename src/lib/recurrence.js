@@ -237,6 +237,26 @@ export function weekLayout(plans, start) {
   return { days, fromHour: 0, toHour: 24, firstHour };
 }
 
+// ---- Homework -----------------------------------------------------------------
+
+// Deadline defaults for homework given in `lesson` on `date`: due at the start of the next lesson
+// of the same subject (from the same timetable), in the lesson's category.
+export function homeworkFor(plans, lesson, date) {
+  let best = null;
+  for (const p of plans) {
+    if (!isLesson(p) || p.timetableId !== lesson.timetableId || p.title !== lesson.title) continue;
+    const next = nextOccurrence(p, addDays(date, 1));
+    if (next && (!best || next < best.date || (next === best.date && p.hour * 60 + p.minute < best.plan.hour * 60 + best.plan.minute))) best = { date: next, plan: p };
+  }
+  return {
+    title: `${lesson.title} homework`,
+    due: best?.date ?? addDays(date, 7),
+    hour: best ? best.plan.hour : null,
+    minute: best ? best.plan.minute : 0,
+    categoryId: lesson.categoryId ?? null,
+  };
+}
+
 // ---- Deadlines ---------------------------------------------------------------
 
 // Whole days from `today` to `due` (negative when overdue).

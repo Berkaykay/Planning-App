@@ -35,3 +35,28 @@ export function exportData(data) {
 
 // Resolves with { data, path }, { error } or null if cancelled.
 export const importData = () => (bridge ? bridge.importData() : Promise.resolve(null));
+
+// Settings the main process acts on: tray, keep running, start at login, menu entry, updates.
+export const applyAppSettings = (settings) => bridge?.applySettings?.(settings);
+export const showMainWindow = () => bridge?.showWindow?.();
+// Changes sent from the tray popup: { action } to apply, or { command } to run.
+export const onRemote = (callback) => bridge?.onRemote?.(callback) ?? (() => {});
+
+const noUpdates = { state: 'unsupported', message: 'Updates are checked in the installed app.' };
+export const updates = {
+  check: () => bridge?.updates?.check() ?? Promise.resolve(noUpdates),
+  download: () => bridge?.updates?.download() ?? Promise.resolve(noUpdates),
+  status: () => bridge?.updates?.status() ?? Promise.resolve(noUpdates),
+  openPage: () => bridge?.updates?.openPage(),
+  onStatus: (callback) => bridge?.updates?.onStatus(callback) ?? (() => {}),
+};
+
+// Imported notification sounds (file names in the data folder's sounds/ folder).
+export const sounds = {
+  list: () => bridge?.sounds?.list() ?? Promise.resolve([]),
+  import: () => bridge?.sounds?.import() ?? Promise.resolve({ added: [], skipped: [], list: [] }),
+  remove: (name) => bridge?.sounds?.remove(name) ?? Promise.resolve([]),
+};
+
+export const miniBridge = bridge?.mini ?? null;
+export const appVersion = () => (typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '');

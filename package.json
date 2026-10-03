@@ -1,6 +1,6 @@
 {
   "name": "planning-app",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "desktopName": "planner.desktop",
   "productName": "Planner",
   "description": "A desktop planning app with browser-style tabs, categories, daily and hourly plans.",
@@ -40,31 +40,17 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
-      ]
+        "nsis"
+      ],
+      "icon": "build/icon.png"
     },
     "nsis": {
       "artifactName": "Planner-Setup-${version}.${ext}",
       "oneClick": true,
       "perMachine": false,
-      "createDesktopShortcut": true
-    },
-    "portable": {
-      "artifactName": "Planner-Portable-${version}.${ext}"
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ],
-      "category": "public.app-category.productivity",
-      "artifactName": "Planner-${version}-mac-${arch}.${ext}"
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Planner"
     },
     "linux": {
       "target": [
@@ -73,6 +59,17 @@
       "category": "Office",
       "syncDesktopName": true,
       "artifactName": "Planner-${version}-linux.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Berkaykay",
+        "repo": "Planning-App",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

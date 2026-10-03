@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import appIcon from '../../build/icon.png';
+import UpdatePill from './UpdatePill.jsx';
 import { useApp } from '../context.js';
 import { currentPath } from '../lib/store.js';
 import { parseRoute, routeTitle, routeIcon, paths } from '../lib/routes.js';
@@ -136,7 +137,7 @@ export default function TabBar() {
   // The strip is also the window's title bar: app icon, tabs, "+", then empty space you can drag
   // the window by (double-click it to maximize), and room for the window buttons.
   return (
-    <header className={`titlebar platform-${window.planner?.platform ?? 'web'}`}>
+    <header className="titlebar">
       <img className="app-logo" src={appIcon} alt="Planner" draggable={false} />
       <div
         className="tabbar"
@@ -189,6 +190,7 @@ export default function TabBar() {
         </button>
       </div>
       <div className="titlebar-drag" data-testid="titlebar-drag" />
+      <UpdatePill />
     </header>
   );
 }

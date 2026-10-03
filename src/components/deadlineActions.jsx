@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context.js';
 import { newId } from '../lib/store.js';
-import { daysLeftLabel, deadlinesDueOn, dueLabel, daysUntil, openDeadlines } from '../lib/recurrence.js';
+import { daysLeftLabel, deadlinesDueOn, dueLabel, daysUntil, homeworkFor, openDeadlines } from '../lib/recurrence.js';
 import { formatMedium, formatTime, isDateKey, parseTime } from '../lib/dates.js';
 import { Modal } from './Dialogs.jsx';
 import Check from './Check.jsx';
@@ -15,6 +15,7 @@ function DeadlineDialog({ initial, categories, onClose }) {
   const [time, setTime] = useState(initial.hour !== null && initial.hour !== undefined ? formatTime(initial.hour, initial.minute) : '');
   const [categoryId, setCategoryId] = useState(initial.categoryId ?? '');
   const [notes, setNotes] = useState(initial.notes ?? '');
+  const [repeat, setRepeat] = useState(initial.repeat === 'weekly');
   const [error, setError] = useState('');
 
   const submit = () => {
@@ -29,6 +30,7 @@ function DeadlineDialog({ initial, categories, onClose }) {
       minute: t === null ? 0 : t % 60,
       categoryId: categoryId || null,
       notes,
+      repeat: repeat ? 'weekly' : null,
     });
   };
 
@@ -74,6 +76,12 @@ function DeadlineDialog({ initial, categories, onClose }) {
           </select>
         </label>
       </div>
+      <label className="check-field">
+        <input type="checkbox" aria-label="Repeat weekly" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} />
+        <span>
+          Repeat weekly <small className="subtle">(when you check it off, next week's one is added)</small>
+        </span>
+      </label>
       <label className="field">
         <span>Notes</span>
         <textarea rows={2} aria-label="Deadline notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional details" />
@@ -95,6 +103,10 @@ export function useDeadlineActions() {
         <DeadlineDialog initial={{ due: today, hour: null, ...defaults }} categories={state.categories} onClose={close} />
       ));
       if (values) dispatch({ type: 'deadline/add', deadline: { ...values, id: newId() } });
+    },
+    // Homework for a lesson: due at the subject's next lesson (see homeworkFor).
+    homework(lesson, date) {
+      return actions.create(homeworkFor(state.plans, lesson, date));
     },
     async edit(deadline) {
       const values = await dialogs.open((close) => <DeadlineDialog initial={deadline} categories={state.categories} onClose={close} />);
@@ -144,9 +156,17 @@ export function DeadlineItem({ deadline, compact = false }) {
   const n = daysUntil(deadline.due, today);
   const urgency = deadline.done ? 'done' : n < 0 ? 'overdue' : n <= 1 ? 'soon' : n <= 3 ? 'near' : '';
   const category = state.categories.find((c) => c.id === deadline.categoryId);
+  // A little sparkle when it's checked off (not when a finished one is merely shown).
+  const wasDone = useRef(deadline.done);
+  const [sparkle, setSparkle] = useState(false);
+  useEffect(() => {
+    if (deadline.done && !wasDone.current) setSparkle(true);
+    wasDone.current = deadline.done;
+  }, [deadline.done]);
   return (
     <div
-      className={`deadline ${urgency} ${compact ? 'compact' : ''}`}
+      className={`deadline ${urgency} ${compact ? 'compact' : ''} ${sparkle ? 'sparkle' : ''}`}
+      onAnimationEnd={(e) => e.animationName === 'deadline-sparkle' && setSparkle(false)}
       data-testid="deadline"
       style={{ '--cat': category?.color ?? 'var(--muted-line)' }}
       onDoubleClick={(e) => !e.target.closest('button') && actions.edit(deadline)}
@@ -159,6 +179,12 @@ export function DeadlineItem({ deadline, compact = false }) {
       <div className="deadline-main">
         <span className="deadline-title" title={`${deadline.title} · ${dueLabel(deadline.due, today)}`}>
           {deadline.title}
+          {deadline.repeat && (
+            <span className="deadline-repeat" title="Repeats every week">
+              {' '}
+              ↻
+            </span>
+          )}
         </span>
         {!compact && (
           <span className="deadline-due">

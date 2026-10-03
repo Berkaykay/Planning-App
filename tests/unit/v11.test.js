@@ -109,7 +109,11 @@ test('version 1 data is migrated', () => {
   assert.equal(s.plans[0].minute, 0);
   assert.equal(s.plans[0].duration, null);
   assert.deepEqual(s.timetables, []);
-  assert.deepEqual(s.settings, { theme: 'system', reminders: { enabled: true, minutes: 10, lessons: false } });
+  assert.equal(s.settings.theme, 'system');
+  assert.deepEqual(
+    { enabled: s.settings.reminders.enabled, minutes: s.settings.reminders.minutes, lessons: s.settings.reminders.lessons },
+    { enabled: true, minutes: 10, lessons: false },
+  );
   assert.equal(normalizeData({ settings: { theme: 'dark' } }).settings.theme, 'dark');
   assert.equal(normalizeData({ settings: { theme: 'neon' } }).settings.theme, 'system');
 });

@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { AppContext } from './context.js';
+import { AppContext, useApp } from './context.js';
 import { normalizeData, activeTab, currentPath, DATA_VERSION } from './lib/store.js';
 import { historyReducer, initHistory } from './lib/history.js';
-import { plansOn, isDone, isLesson, lessonAttended } from './lib/recurrence.js';
-import { addDays, formatTime, formatTimeRange } from './lib/dates.js';
-import { loadData, saveData, onAppCommand } from './lib/persistence.js';
+import { dueReminders } from './lib/reminders.js';
+import { playSound } from './lib/sounds.js';
+import { loadData, saveData, onAppCommand, onRemote, applyAppSettings, showMainWindow } from './lib/persistence.js';
 import { parseRoute, paths } from './lib/routes.js';
 import { todayKey } from './lib/dates.js';
 import { DialogHost, useDialogState } from './components/Dialogs.jsx';
@@ -21,6 +21,10 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { ContextMenu, useContextMenuState } from './components/ContextMenu.jsx';
 import { DragProvider } from './components/dragDrop.jsx';
 import { usePlanActions } from './components/planActions.jsx';
+import { useDeadlineActions } from './components/deadlineActions.jsx';
+import CommandPalette from './components/CommandPalette.jsx';
+import Confetti from './components/Confetti.jsx';
+import { addDays } from './lib/dates.js';
 import Week from './pages/Week.jsx';
 import NotFound from './pages/NotFound.jsx';
 import History from './pages/History.jsx';
@@ -57,41 +61,29 @@ function useToday() {
   return today;
 }
 
-// Shows a desktop notification shortly before timed plans (and optionally lessons) start.
-function useReminders(plans, deadlines, reminders) {
+// Shows a desktop notification (with the plan's category) and plays its sound shortly before
+// timed plans, lessons (if turned on) and deadlines; see src/lib/reminders.js for the rules.
+function useReminders(state) {
   const notified = useRef(new Set());
+  const { plans, deadlines, categories } = state;
+  const { reminders } = state.settings;
   useEffect(() => {
     if (!reminders.enabled || typeof Notification === 'undefined') return undefined;
     const check = () => {
-      const now = new Date();
-      const date = todayKey();
-      const minutesNow = now.getHours() * 60 + now.getMinutes();
-      for (const p of plansOn(plans, date)) {
-        if (p.hour === null || (isLesson(p) ? !reminders.lessons || lessonAttended(p, date, now) : isDone(p, date))) continue;
-        const lead = p.hour * 60 + p.minute - minutesNow;
-        const key = `${p.id}:${date}`;
-        if (lead < 0 || lead > reminders.minutes || notified.current.has(key)) continue;
-        notified.current.add(key);
-        new Notification(p.title, {
-          body: `${lead === 0 ? 'Starts now' : `Starts in ${lead} min`} · ${formatTimeRange(p)}`,
-        });
-      }
-      // Deadlines: once the day before, and once on the day (from 08:00 on).
-      if (now.getHours() >= 8) {
-        for (const d of deadlines) {
-          if (d.done) continue;
-          const when = d.due === date ? 'today' : d.due === addDays(date, 1) ? 'tomorrow' : null;
-          const key = `deadline:${d.id}:${date}`;
-          if (!when || notified.current.has(key)) continue;
-          notified.current.add(key);
-          new Notification(`Deadline ${when}: ${d.title}`, { body: d.hour !== null ? `Due ${when} at ${formatTime(d.hour, d.minute)}` : `Due ${when}` });
-        }
+      let played = false;
+      for (const r of dueReminders({ plans, deadlines, categories, reminders })) {
+        if (notified.current.has(r.key)) continue;
+        notified.current.add(r.key);
+        // The app plays the sound itself (the same on Windows and Linux), so the toast is silent.
+        const n = new Notification(r.title, { body: r.body, silent: true });
+        n.onclick = () => showMainWindow();
+        if (!played) played = Boolean(playSound(r.sound, reminders.volume));
       }
     };
     check();
     const timer = setInterval(check, 20_000);
     return () => clearInterval(timer);
-  }, [plans, deadlines, reminders]);
+  }, [plans, deadlines, categories, reminders]);
 }
 
 // Handles dropping a dragged plan on an hour, a day or a category.
@@ -104,6 +96,18 @@ function PlanDragLayer({ children }) {
     else if (target.kind === 'category') actions.setCategory(plan, target.id);
   };
   return <DragProvider onDrop={onDrop}>{children}</DragProvider>;
+}
+
+// Lets commands outside the page tree (menu, tray popup) open the plan and deadline dialogs.
+function CommandActions({ actionsRef }) {
+  const { today } = useApp();
+  const planActions = usePlanActions();
+  const deadlineActions = useDeadlineActions();
+  actionsRef.current = {
+    newPlan: () => planActions.create({}),
+    newDeadline: () => deadlineActions.create({ due: addDays(today, 7) }),
+  };
+  return null;
 }
 
 const isEditable = (el) => el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
@@ -125,7 +129,17 @@ function Planner({ initial, readOnly }) {
     document.documentElement.dataset.theme = state.settings.theme;
   }, [state.settings.theme]);
 
-  useReminders(state.plans, state.deadlines, state.settings.reminders);
+  useReminders(state);
+
+  // Tell the main process about the options it handles (tray, start at login, updates…).
+  const { background, updates: updateSettings } = state.settings;
+  useEffect(() => {
+    applyAppSettings({ background, updates: updateSettings });
+  }, [background, updateSettings]);
+
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // "New plan" / "New deadline" for menu commands and the tray popup (filled in by CommandActions).
+  const commandActions = useRef({ newPlan() {}, newDeadline() {} });
 
   // Save every change. Saves are processed in order by the main process.
   useEffect(() => {
@@ -191,6 +205,15 @@ function Planner({ initial, readOnly }) {
           addressRef.current?.focus();
           addressRef.current?.select();
           break;
+        case 'quick-search':
+          setPaletteOpen(true);
+          break;
+        case 'new-plan':
+          commandActions.current.newPlan();
+          break;
+        case 'new-deadline':
+          commandActions.current.newDeadline();
+          break;
         default:
       }
     },
@@ -199,13 +222,23 @@ function Planner({ initial, readOnly }) {
 
   useEffect(() => onAppCommand(runCommand), [runCommand]);
 
+  // Changes made in the tray popup arrive here, so this window stays the only one changing data.
+  useEffect(
+    () =>
+      onRemote(({ action, command }) => {
+        if (action) dispatch(action);
+        if (command?.startsWith?.('open:')) navigate(command.slice(5));
+        else if (command) runCommand(command);
+      }),
+    [runCommand, navigate],
+  );
+
   // Keyboard and mouse shortcuts. Handling them here (and preventing the default) means the
   // shortcuts also work when the native menu is hidden.
   useEffect(() => {
-    const isMac = navigator.platform.toLowerCase().includes('mac');
     const onKey = (e) => {
       if (dialogs.isOpen) return;
-      const mod = isMac ? e.metaKey : e.ctrlKey;
+      const mod = e.ctrlKey;
       let command = null;
       const key = e.key.toLowerCase();
       if (e.ctrlKey && key === 'tab') command = e.shiftKey ? 'prev-tab' : 'next-tab';
@@ -214,7 +247,7 @@ function Planner({ initial, readOnly }) {
         // Inside text fields Ctrl+Z keeps undoing typing as usual.
         command = key === 'y' || e.shiftKey ? 'redo' : 'undo';
       } else if (mod && !e.shiftKey && !e.altKey) {
-        command = { t: 'new-tab', w: 'close-tab', l: 'focus-address', 1: 'go-dashboard', 2: 'go-calendar', 3: 'go-today', 4: 'go-categories', '[': 'back', ']': 'forward' }[key] ?? null;
+        command = { k: 'quick-search', t: 'new-tab', w: 'close-tab', l: 'focus-address', 1: 'go-dashboard', 2: 'go-calendar', 3: 'go-today', 4: 'go-categories' }[key] ?? null;
       } else if (e.altKey && !mod && !e.shiftKey) {
         command = { arrowleft: 'back', arrowright: 'forward' }[key] ?? null;
       }
@@ -324,6 +357,9 @@ function Planner({ initial, readOnly }) {
           <DialogHost dialogs={dialogs} />
         </ErrorBoundary>
         <ContextMenu menu={openMenuState} onClose={closeMenu} />
+        <CommandActions actionsRef={commandActions} />
+        <Confetti days={state.days} />
+        {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} onCommand={runCommand} />}
       </PlanDragLayer>
     </AppContext.Provider>
   );

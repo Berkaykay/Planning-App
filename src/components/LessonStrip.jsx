@@ -4,6 +4,7 @@ import { lessonsOn, lessonAttended } from '../lib/recurrence.js';
 import { formatTimeRange } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import Link from './Link.jsx';
+import { useDeadlineActions } from './deadlineActions.jsx';
 
 // The current time, refreshed every 30 seconds.
 export function useNow() {
@@ -19,6 +20,7 @@ export function useNow() {
 // automatically once it's over; click one to mark yourself absent (or attended again).
 export default function LessonStrip({ date, compact = false }) {
   const { state, dispatch, navigate, menu } = useApp();
+  const deadlineActions = useDeadlineActions();
   const now = useNow();
   const lessons = lessonsOn(state.plans, date);
   if (!lessons.length) return null;
@@ -32,6 +34,18 @@ export default function LessonStrip({ date, compact = false }) {
         <span className="subtle">
           {attended}/{lessons.length} attended
         </span>
+        <button
+          className="small-button homework-button"
+          title="Add homework due at the subject's next lesson"
+          onClick={(e) => {
+            // One entry per subject (a subject can have several lessons in a day).
+            const subjects = [...new Map(lessons.map((l) => [l.title, l])).values()];
+            if (subjects.length === 1) return deadlineActions.homework(subjects[0], date);
+            menu.open(e, subjects.map((l) => ({ label: l.title, onSelect: () => deadlineActions.homework(l, date) })));
+          }}
+        >
+          + Homework
+        </button>
         <Link to={paths.timetable()} className="card-link">
           Timetable →
         </Link>
@@ -54,6 +68,7 @@ export default function LessonStrip({ date, compact = false }) {
                   { label: 'Mark attended', checked: done, onSelect: () => set(p, true) },
                   { label: 'Mark absent', checked: Boolean(absent), onSelect: () => set(p, false) },
                   null,
+                  { label: 'Add homework…', onSelect: () => deadlineActions.homework(p, date) },
                   { label: 'Open Timetable', onSelect: () => navigate(paths.timetable()) },
                 ])
               }

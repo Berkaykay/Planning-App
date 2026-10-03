@@ -1,10 +1,10 @@
 // All app data lives in one object, changed only through `reducer` actions.
 // The whole object is saved to disk after every change.
-import { isDateKey, parseTime } from './dates.js';
+import { addDays, isDateKey, parseTime } from './dates.js';
 import { HOME } from './routes.js';
 import { FREQUENCIES, tasksOn, isDone } from './recurrence.js';
 
-export const DATA_VERSION = 5;
+export const DATA_VERSION = 6;
 const MAX_HISTORY = 100;
 
 // Muted colors: categories show up as small dots and thin markers, not big colored areas.
@@ -19,10 +19,24 @@ const OLD_COLORS = {
 };
 
 export const THEMES = ['system', 'light', 'dark'];
+// Sounds made by the app itself (see src/lib/sounds.js); imported sound files are "file:<name>".
+export const BUILTIN_SOUNDS = ['chime', 'bell', 'pop', 'none'];
 const DEFAULT_SETTINGS = {
   theme: 'system',
-  // Desktop notification `minutes` before a timed plan (and optionally a lesson) starts.
-  reminders: { enabled: true, minutes: 10, lessons: false },
+  // Desktop notification `minutes` before a timed plan (and optionally a lesson) starts, with a
+  // sound, quiet hours and per-category overrides ({ [categoryId]: { enabled, sound, minutes } }).
+  reminders: {
+    enabled: true,
+    minutes: 10,
+    lessons: false,
+    sound: 'chime',
+    volume: 0.7,
+    quiet: { enabled: false, from: '23:00', to: '07:00' },
+    perCategory: {},
+  },
+  updates: { auto: true },
+  // Tray icon, keep running when the window is closed, start at login, applications-menu entry.
+  background: { tray: false, keepRunning: false, startOnLogin: false, menuLauncher: true },
 };
 const MAX_CLOSED_TABS = 10;
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -105,7 +119,41 @@ export function normalizeDeadline(raw) {
     categoryId: raw.categoryId || null,
     notes: String(raw.notes ?? ''),
     done: Boolean(raw.done),
+    // 'weekly': checking it done adds the next one, due a week later (e.g. weekly homework).
+    repeat: raw.repeat === 'weekly' ? 'weekly' : null,
     createdAt: raw.createdAt || new Date().toISOString(),
+  };
+}
+
+const isSound = (v) => typeof v === 'string' && (BUILTIN_SOUNDS.includes(v) || /^file:[^/\\]+$/.test(v));
+const isClock = (v) => typeof v === 'string' && parseTime(v) !== null;
+const bool = (v, fallback) => (typeof v === 'boolean' ? v : fallback);
+const minutesOk = (v) => Number.isInteger(v) && v >= 0 && v <= 240;
+
+export function normalizeReminders(r = {}, categoryIds = null) {
+  const d = DEFAULT_SETTINGS.reminders;
+  const q = r.quiet ?? {};
+  const perCategory = {};
+  for (const [id, c] of Object.entries(r.perCategory ?? {})) {
+    if (!c || (categoryIds && !categoryIds.has(id))) continue;
+    perCategory[id] = {
+      enabled: bool(c.enabled, true),
+      sound: isSound(c.sound) ? c.sound : null,
+      minutes: minutesOk(c.minutes) ? c.minutes : null,
+    };
+  }
+  return {
+    enabled: bool(r.enabled, d.enabled),
+    minutes: minutesOk(r.minutes) ? r.minutes : d.minutes,
+    lessons: bool(r.lessons, d.lessons),
+    sound: isSound(r.sound) ? r.sound : d.sound,
+    volume: typeof r.volume === 'number' && r.volume >= 0 && r.volume <= 1 ? r.volume : d.volume,
+    quiet: {
+      enabled: bool(q.enabled, d.quiet.enabled),
+      from: isClock(q.from) ? q.from : d.quiet.from,
+      to: isClock(q.to) ? q.to : d.quiet.to,
+    },
+    perCategory,
   };
 }
 
@@ -202,13 +250,17 @@ export function normalizeData(raw) {
   const timetables = (Array.isArray(raw.timetables) ? raw.timetables : [])
     .filter((t) => t?.id && isDateKey(t.startDate))
     .map(normalizeTimetable);
-  const r = raw.settings?.reminders ?? {};
+  const b = raw.settings?.background ?? {};
+  const db = DEFAULT_SETTINGS.background;
   const settings = {
     theme: THEMES.includes(raw.settings?.theme) ? raw.settings.theme : DEFAULT_SETTINGS.theme,
-    reminders: {
-      enabled: typeof r.enabled === 'boolean' ? r.enabled : DEFAULT_SETTINGS.reminders.enabled,
-      minutes: Number.isInteger(r.minutes) && r.minutes >= 0 && r.minutes <= 240 ? r.minutes : DEFAULT_SETTINGS.reminders.minutes,
-      lessons: typeof r.lessons === 'boolean' ? r.lessons : DEFAULT_SETTINGS.reminders.lessons,
+    reminders: normalizeReminders(raw.settings?.reminders, categoryIds),
+    updates: { auto: bool(raw.settings?.updates?.auto, DEFAULT_SETTINGS.updates.auto) },
+    background: {
+      tray: bool(b.tray, db.tray),
+      keepRunning: bool(b.keepRunning, db.keepRunning),
+      startOnLogin: bool(b.startOnLogin, db.startOnLogin),
+      menuLauncher: bool(b.menuLauncher, db.menuLauncher),
     },
   };
   const closed = (raw.session?.closed ?? []).filter((c) => c?.tab?.id && Array.isArray(c.tab.history)).slice(-MAX_CLOSED_TABS);
@@ -445,11 +497,20 @@ export function reducer(state, action) {
     // ---- Deadlines --------------------------------------------------------
     case 'deadline/add':
       return { ...state, deadlines: [...state.deadlines, normalizeDeadline(action.deadline)] };
-    case 'deadline/update':
-      return {
-        ...state,
-        deadlines: state.deadlines.map((d) => (d.id === action.id ? normalizeDeadline({ ...d, ...action.changes }) : d)),
-      };
+    case 'deadline/update': {
+      const old = state.deadlines.find((d) => d.id === action.id);
+      if (!old) return state;
+      const updated = normalizeDeadline({ ...old, ...action.changes });
+      let deadlines = state.deadlines.map((d) => (d.id === action.id ? updated : d));
+      // A weekly deadline checked off brings in next week's (once, even if re-checked later).
+      if (updated.repeat === 'weekly' && updated.done && !old.done) {
+        const due = addDays(updated.due, 7);
+        if (!deadlines.some((d) => d.title === updated.title && d.due === due && d.repeat === 'weekly')) {
+          deadlines = [...deadlines, normalizeDeadline({ ...updated, id: newId(), due, done: false, createdAt: undefined })];
+        }
+      }
+      return { ...state, deadlines };
+    }
     case 'deadline/delete':
       return { ...state, deadlines: state.deadlines.filter((d) => d.id !== action.id) };
 
