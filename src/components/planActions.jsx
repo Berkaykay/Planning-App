@@ -4,12 +4,13 @@ import { newId } from '../lib/store.js';
 import { isDone } from '../lib/recurrence.js';
 import { addDays, formatMedium, formatTimeRange, weekStart } from '../lib/dates.js';
 import PlanDialog from './PlanDialog.jsx';
-import { DatePromptDialog } from './Dialogs.jsx';
+import { DatePromptDialog, useConfirmDelete } from './Dialogs.jsx';
 
 // Shared add / edit / move / delete / complete behavior for plans, used by every page.
 // For repeating plans, the user is asked whether a change applies to one day or the whole series.
 export function usePlanActions() {
   const { state, dispatch, dialogs, today, menu } = useApp();
+  const confirmDelete = useConfirmDelete();
 
   const askScope = (plan, verb, date) =>
     dialogs.choose({
@@ -83,7 +84,7 @@ export function usePlanActions() {
         return;
       }
       const when = plan.hour === null ? formatMedium(plan.date) : `${formatMedium(plan.date)}, ${formatTimeRange(plan)}`;
-      const ok = await dialogs.confirm({
+      const ok = await confirmDelete({
         title: 'Delete plan',
         message: `Delete "${plan.title}" (${when})?`,
         confirmLabel: 'Delete',

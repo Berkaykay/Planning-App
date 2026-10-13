@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import appIcon from '../../build/icon.png';
+import AppMark from './AppMark.jsx';
 import UpdatePill from './UpdatePill.jsx';
 import { useApp } from '../context.js';
 import { currentPath } from '../lib/store.js';
@@ -138,7 +138,9 @@ export default function TabBar() {
   // the window by (double-click it to maximize), and room for the window buttons.
   return (
     <header className="titlebar">
-      <img className="app-logo" src={appIcon} alt="Planner" draggable={false} />
+      <span className="app-logo" title="Cadence">
+        <AppMark />
+      </span>
       <div
         className="tabbar"
         role="tablist"

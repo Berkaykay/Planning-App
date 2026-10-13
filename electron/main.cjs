@@ -2,16 +2,27 @@ const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, protocol, s
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { createStorage } = require('./storage.cjs');
+const { createStorage, migrateFolder } = require('./storage.cjs');
 const { createSounds } = require('./sounds.cjs');
 const { setupUpdates } = require('./updates.cjs');
 const { createTray } = require('./tray.cjs');
 const launcher = require('./launcher.cjs');
 
+// On Linux, Cadence runs through XWayland: native Wayland doesn't let an app place its own windows,
+// and the tray popup has to open right at the tray. CADENCE_WAYLAND=1 keeps it native.
+if (process.platform === 'linux' && process.env.CADENCE_WAYLAND !== '1') app.commandLine.appendSwitch('ozone-platform', 'x11');
+
 // PLANNER_DATA_DIR lets tests (or power users) point the app at another data folder. Electron's
 // own files then go next to it, so test runs never share a profile (or the single-instance lock).
 const dataDir = process.env.PLANNER_DATA_DIR || app.getPath('userData');
 if (process.env.PLANNER_DATA_DIR) app.setPath('userData', `${process.env.PLANNER_DATA_DIR}-electron`);
+// The app used to be called Planner: bring its data over from the old folder on first start.
+try {
+  const legacy = process.env.CADENCE_LEGACY_DATA_DIR ?? (process.env.PLANNER_DATA_DIR ? null : path.join(app.getPath('appData'), 'Planner'));
+  if (migrateFolder(legacy, dataDir)) console.log(`Moved your data from ${legacy} to ${dataDir}`);
+} catch (err) {
+  console.error('Could not move the data from the old Planner folder', err);
+}
 const storage = createStorage(dataDir);
 const sounds = createSounds(dataDir);
 const PRELOAD = path.join(__dirname, 'preload.cjs');
@@ -30,13 +41,13 @@ let background = { tray: false, keepRunning: false, startOnLogin: false, menuLau
 // Imported notification sounds are played from planner-sound://sounds/<name>.
 protocol.registerSchemesAsPrivileged([{ scheme: 'planner-sound', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
 
-// Only one Planner runs at a time: starting it again brings the open one to the front.
+// Only one Cadence runs at a time: starting it again brings the open one to the front.
 if (!app.requestSingleInstanceLock()) {
   app.exit(0);
 } else {
   app.on('second-instance', () => showMain());
 }
-// Windows uses this to show Planner's name and icon on notifications.
+// Windows uses this to show Cadence's name and icon on notifications.
 if (process.platform === 'win32') app.setAppUserModelId('com.berkaykay.planner');
 
 const send = (channel, payload) => mainWindow?.webContents.send(channel, payload);
@@ -61,7 +72,16 @@ function quit() {
   app.quit();
 }
 
-const tray = createTray({ loadPage, preload: PRELOAD, backgroundColor: darkBackground, openMain: showMain, quit, getData: () => latestData });
+const tray = createTray({
+  loadPage,
+  preload: PRELOAD,
+  backgroundColor: darkBackground,
+  openMain: showMain,
+  quit,
+  getData: () => latestData,
+  // The main window shows the notification and plays the sound.
+  onFocusDone: () => send('app:remote', { command: 'focus-done' }),
+});
 const updates = setupUpdates({ send: (status) => send('updates:status', status) });
 
 function buildMenu() {
@@ -124,7 +144,7 @@ function createWindow({ show = true } = {}) {
     minWidth: 820,
     minHeight: 560,
     show,
-    title: 'Planner',
+    title: 'Cadence',
     icon: ICON,
     backgroundColor: darkBackground(),
     // Browser-style frame: the tab strip is the top of the window, and Electron draws the
@@ -194,6 +214,13 @@ function applyBackground(next, { startup = false } = {}) {
   const prev = background;
   background = { ...background, ...next };
   tray.enable(background.tray);
+  if (startup) {
+    try {
+      launcher.removeLegacyEntries();
+    } catch (err) {
+      console.error('Could not remove the old Planner menu entries', err);
+    }
+  }
   if (startup || prev.startOnLogin !== background.startOnLogin) {
     try {
       launcher.setStartOnLogin(background.startOnLogin);
@@ -249,7 +276,11 @@ ipcMain.on('mini:command', (_event, command) => {
   send('app:remote', { command });
 });
 ipcMain.on('mini:hide', () => tray.hideMini());
-ipcMain.on('mini:ready', () => tray.sendState());
+ipcMain.on('mini:ready', () => {
+  tray.sendState();
+  tray.sendFocus();
+});
+ipcMain.on('focus:action', (_event, action) => tray.focusAction(action));
 
 // In-app updates.
 ipcMain.handle('updates:check', () => updates.check());
@@ -280,9 +311,9 @@ ipcMain.handle('data:export', async (_event, data) => {
   let target = process.env.PLANNER_TEST_EXPORT_PATH;
   if (!target) {
     const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Export planner backup',
-      defaultPath: `planner-backup-${new Date().toISOString().slice(0, 10)}.json`,
-      filters: [{ name: 'Planner backup', extensions: ['json'] }],
+      title: 'Export Cadence backup',
+      defaultPath: `cadence-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: 'Cadence backup', extensions: ['json'] }],
     });
     if (result.canceled || !result.filePath) return null;
     target = result.filePath;
@@ -294,9 +325,9 @@ ipcMain.handle('data:import', async () => {
   let source = process.env.PLANNER_TEST_IMPORT_PATH;
   if (!source) {
     const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Import planner backup',
+      title: 'Import Cadence backup',
       properties: ['openFile'],
-      filters: [{ name: 'Planner backup', extensions: ['json'] }],
+      filters: [{ name: 'Cadence backup', extensions: ['json'] }],
     });
     if (result.canceled || !result.filePaths.length) return null;
     source = result.filePaths[0];

@@ -23,12 +23,15 @@ import { DragProvider } from './components/dragDrop.jsx';
 import { usePlanActions } from './components/planActions.jsx';
 import { useDeadlineActions } from './components/deadlineActions.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
+import { useSpecialDayActions } from './components/specialDays.jsx';
+import { useHabitActions } from './components/habits.jsx';
 import Confetti from './components/Confetti.jsx';
 import { addDays } from './lib/dates.js';
 import Week from './pages/Week.jsx';
 import NotFound from './pages/NotFound.jsx';
 import History from './pages/History.jsx';
 import Settings from './pages/Settings.jsx';
+import Habits from './pages/Habits.jsx';
 
 export default function App() {
   const [initial, setInitial] = useState(null);
@@ -65,13 +68,13 @@ function useToday() {
 // timed plans, lessons (if turned on) and deadlines; see src/lib/reminders.js for the rules.
 function useReminders(state) {
   const notified = useRef(new Set());
-  const { plans, deadlines, categories } = state;
+  const { plans, deadlines, specialDays, categories } = state;
   const { reminders } = state.settings;
   useEffect(() => {
     if (!reminders.enabled || typeof Notification === 'undefined') return undefined;
     const check = () => {
       let played = false;
-      for (const r of dueReminders({ plans, deadlines, categories, reminders })) {
+      for (const r of dueReminders({ plans, deadlines, specialDays, categories, reminders })) {
         if (notified.current.has(r.key)) continue;
         notified.current.add(r.key);
         // The app plays the sound itself (the same on Windows and Linux), so the toast is silent.
@@ -83,7 +86,7 @@ function useReminders(state) {
     check();
     const timer = setInterval(check, 20_000);
     return () => clearInterval(timer);
-  }, [plans, deadlines, categories, reminders]);
+  }, [plans, deadlines, specialDays, categories, reminders]);
 }
 
 // Handles dropping a dragged plan on an hour, a day or a category.
@@ -103,9 +106,13 @@ function CommandActions({ actionsRef }) {
   const { today } = useApp();
   const planActions = usePlanActions();
   const deadlineActions = useDeadlineActions();
+  const specialActions = useSpecialDayActions();
+  const habitActions = useHabitActions();
   actionsRef.current = {
     newPlan: () => planActions.create({}),
     newDeadline: () => deadlineActions.create({ due: addDays(today, 7) }),
+    newSpecial: () => specialActions.create(),
+    newHabit: () => habitActions.create(),
   };
   return null;
 }
@@ -139,7 +146,7 @@ function Planner({ initial, readOnly }) {
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   // "New plan" / "New deadline" for menu commands and the tray popup (filled in by CommandActions).
-  const commandActions = useRef({ newPlan() {}, newDeadline() {} });
+  const commandActions = useRef({ newPlan() {}, newDeadline() {}, newSpecial() {}, newHabit() {} });
 
   // Save every change. Saves are processed in order by the main process.
   useEffect(() => {
@@ -214,6 +221,12 @@ function Planner({ initial, readOnly }) {
         case 'new-deadline':
           commandActions.current.newDeadline();
           break;
+        case 'new-special':
+          commandActions.current.newSpecial();
+          break;
+        case 'new-habit':
+          commandActions.current.newHabit();
+          break;
         default:
       }
     },
@@ -223,11 +236,21 @@ function Planner({ initial, readOnly }) {
   useEffect(() => onAppCommand(runCommand), [runCommand]);
 
   // Changes made in the tray popup arrive here, so this window stays the only one changing data.
+  const remindersRef = useRef(state.settings.reminders);
+  remindersRef.current = state.settings.reminders;
   useEffect(
     () =>
       onRemote(({ action, command }) => {
         if (action) dispatch(action);
-        if (command?.startsWith?.('open:')) navigate(command.slice(5));
+        if (command === 'focus-done') {
+          // The tray popup's focus timer ran out.
+          const r = remindersRef.current;
+          if (typeof Notification !== 'undefined') {
+            const n = new Notification('Focus time is over 🎉', { body: 'Nice work! Time for a short break.', silent: true });
+            n.onclick = () => showMainWindow();
+          }
+          playSound(r.sound === 'none' ? 'chime' : r.sound, r.volume);
+        } else if (command?.startsWith?.('open:')) navigate(command.slice(5));
         else if (command) runCommand(command);
       }),
     [runCommand, navigate],
@@ -302,6 +325,9 @@ function Planner({ initial, readOnly }) {
     case 'settings':
       page = <Settings />;
       break;
+    case 'habits':
+      page = <Habits />;
+      break;
     case 'category':
       page = <CategoryPage id={route.id} />;
       break;
@@ -331,7 +357,7 @@ function Planner({ initial, readOnly }) {
           {saveError && <div className="save-error">Could not save your changes: {saveError}</div>}
           {readOnly && (
             <div className="save-error">
-              Your data was saved by a newer version of Planner, so this older version won't change it. Install the latest
+              Your data was saved by a newer version of Cadence, so this older version won't change it. Install the latest
               version to keep planning.
             </div>
           )}

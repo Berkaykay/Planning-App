@@ -24,6 +24,7 @@ export default function Sidebar() {
     { to: paths.week(), label: 'Week', icon: '▥', active: route.page === 'week' },
     { to: paths.timetable(), label: 'Timetable', icon: '▤', active: route.page === 'timetable' },
     { to: paths.history(), label: 'History', icon: '↺', active: route.page === 'history' },
+    { to: paths.habits(), label: 'Habits', icon: '✿', active: route.page === 'habits' },
     { to: paths.categories(), label: 'Categories', icon: '◉', active: route.page === 'categories' },
   ];
 

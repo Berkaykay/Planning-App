@@ -12,9 +12,12 @@ import {
   currentStreak,
   rangeStats,
   upNext,
+  specialDaysOn,
 } from '../lib/recurrence.js';
 import { addDays, formatLong, formatTime, formatTimeRange, formatWeekday, fromKey, relativeDayLabel, weekStart } from '../lib/dates.js';
 import { DayFlag, DeadlineItem, useDeadlineActions } from '../components/deadlineActions.jsx';
+import { ComingUpCard } from '../components/specialDays.jsx';
+import { HabitsToday } from '../components/habits.jsx';
 import { useNow } from '../components/LessonStrip.jsx';
 import { DayStamp } from '../components/Check.jsx';
 import { paths } from '../lib/routes.js';
@@ -40,9 +43,7 @@ export default function Dashboard() {
   const todays = tasksOn(state.plans, today);
   const done = todays.filter((p) => isDone(p, today)).length;
   const dayDone = Boolean(state.days[today]?.done);
-  const routines = state.plans.filter(
-    (p) => p.repeat && !isLesson(p) && (!p.repeat.until || p.repeat.until >= today) && p.date <= today,
-  );
+  const routines = state.plans.filter((p) => p.repeat && !isLesson(p) && (!p.repeat.until || p.repeat.until >= today) && p.date <= today);
   const upcoming = Array.from({ length: 7 }, (_, i) => addDays(today, i + 1));
 
   return (
@@ -55,34 +56,35 @@ export default function Dashboard() {
       <WeekStrip />
 
       <div className="cards">
-        <section className={`card today-card ${dayDone ? 'day-done' : ''}`}>
-          <div className="card-head">
-            <Check checked={dayDone} onChange={(v) => dispatch({ type: 'day/setDone', date: today, done: v })} label="Mark today complete" />
-            <h2 className="day-heading">Today</h2>
-            <span className="subtle">
-              {done}/{todays.length} done
-            </span>
-            <Link to={paths.day(today)} className="card-link">
-              Open planner →
-            </Link>
-          </div>
-          <Progress done={done} total={todays.length} />
-          <div className="plan-list">
-            {todays.length === 0 && <p className="empty">Nothing planned for today yet.</p>}
-            {todays.map((p) => (
-              <PlanItem key={p.id} plan={p} date={today} />
-            ))}
-          </div>
-          <QuickAdd
-            placeholder="Add a plan for today"
-            onAdd={(title) => dispatch({ type: 'plan/add', plan: { id: newId(), title, date: today, hour: null } })}
-          />
-          <LessonStrip date={today} compact />
-        </section>
+        <div className="dashboard-main">
+          <section className={`card today-card ${dayDone ? 'day-done' : ''}`}>
+            <div className="card-head">
+              <Check checked={dayDone} onChange={(v) => dispatch({ type: 'day/setDone', date: today, done: v })} label="Mark today complete" />
+              <h2 className="day-heading">Today</h2>
+              <span className="subtle">
+                {done}/{todays.length} done
+              </span>
+              <Link to={paths.day(today)} className="card-link">
+                Open planner →
+              </Link>
+            </div>
+            <Progress done={done} total={todays.length} />
+            <div className="plan-list">
+              {todays.length === 0 && <p className="empty">Nothing planned for today yet.</p>}
+              {todays.map((p) => (
+                <PlanItem key={p.id} plan={p} date={today} />
+              ))}
+            </div>
+            <QuickAdd placeholder="Add a plan for today" onAdd={(title) => dispatch({ type: 'plan/add', plan: { id: newId(), title, date: today, hour: null } })} />
+            <LessonStrip date={today} compact />
+          </section>
+          <HabitsToday date={today} card />
+        </div>
 
         <div className="dashboard-side">
           <UpNext />
           <Deadlines />
+          <ComingUpCard />
           <Unfinished />
 
           <section className="card">
@@ -233,6 +235,11 @@ function WeekStrip() {
             <span className="strip-count">
               {total ? `${done}/${total}` : '–'}
               <DayFlag date={date} className="strip-flag" size={11} />
+              {specialDaysOn(state.specialDays, date).map((s) => (
+                <span key={s.id} className="strip-special" title={s.title}>
+                  {s.emoji}
+                </span>
+              ))}
             </span>
             {dayDone && <DayStamp />}
           </button>

@@ -23,7 +23,8 @@ import { dropAttr } from '../components/dragDrop.jsx';
 import { usePlanActions } from '../components/planActions.jsx';
 import { useDeadlineActions, DeadlineItem, DayFlag } from '../components/deadlineActions.jsx';
 import { FlagIcon } from '../components/Icons.jsx';
-import { deadlinesDueOn } from '../lib/recurrence.js';
+import { deadlinesDueOn, specialDaysOn } from '../lib/recurrence.js';
+import { SpecialDayItem, SpecialTicket, useSpecialDayActions } from '../components/specialDays.jsx';
 
 const MAX_DOTS = 6;
 
@@ -31,6 +32,7 @@ export default function Calendar({ month, date: initialDate }) {
   const { state, dispatch, navigate, today, menu } = useApp();
   const actions = usePlanActions();
   const deadlineActions = useDeadlineActions();
+  const specialActions = useSpecialDayActions();
   // Clicking a day selects it and shows it in the side panel; double-click opens the Day Planner.
   const [selected, setSelected] = useState(initialDate ?? (monthOf(today) === month ? today : `${month}-01`));
   // Stamps only animate for days completed while this page is open.
@@ -50,6 +52,7 @@ export default function Calendar({ month, date: initialDate }) {
       null,
       { label: 'Add plan…', onSelect: () => actions.create({ date }) },
       { label: 'Add deadline…', onSelect: () => deadlineActions.create({ due: date }) },
+      { label: 'Add special day…', onSelect: () => specialActions.create({ date }) },
       { label: done ? 'Mark day as not complete' : 'Mark day complete', onSelect: () => dispatch({ type: 'day/setDone', date, done: !done }) },
       null,
       { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: () => dispatch({ type: 'history/undo' }) },
@@ -142,6 +145,8 @@ export default function Calendar({ month, date: initialDate }) {
                       />
                     ))}
                   </span>
+                  {/* Birthdays and other special days: a ticket in the bottom-right corner (not a plan). */}
+                  <SpecialTicket date={date} />
                 </div>
               );
             })}
@@ -159,6 +164,8 @@ export default function Calendar({ month, date: initialDate }) {
 function SelectedDay({ date, onOpen }) {
   const { state, dispatch, today } = useApp();
   const deadlineActions = useDeadlineActions();
+  const specialActions = useSpecialDayActions();
+  const specials = specialDaysOn(state.specialDays, date);
   const deadlines = deadlinesDueOn(state.deadlines, date);
   const openOnes = deadlines.filter((d) => !d.done);
   const finished = deadlines.filter((d) => d.done);
@@ -180,6 +187,16 @@ function SelectedDay({ date, onOpen }) {
       </div>
       {plans.length > 0 && <Progress done={completed.length} total={plans.length} />}
       <div className="selected-body">
+        {specials.length > 0 && (
+          <div className="plan-group" data-testid="day-specials">
+            <div className="section-label">Special days</div>
+            <div className="plan-list">
+              {specials.map((s) => (
+                <SpecialDayItem key={s.id} special={s} date={date} showWhen={false} />
+              ))}
+            </div>
+          </div>
+        )}
         {openOnes.length > 0 && (
           <div className="plan-group" data-testid="day-deadlines">
             <div className="section-label">Deadlines · {openOnes.length}</div>
@@ -221,9 +238,14 @@ function SelectedDay({ date, onOpen }) {
         <button className="link-button open-day" onClick={onOpen}>
           Open in Day Planner →
         </button>
-        <button className="small-button" onClick={() => deadlineActions.create({ due: date })}>
-          <FlagIcon size={13} /> Add deadline
-        </button>
+        <div className="panel-buttons">
+          <button className="small-button" onClick={() => specialActions.create({ date })}>
+            ★ Special day
+          </button>
+          <button className="small-button" onClick={() => deadlineActions.create({ due: date })}>
+            <FlagIcon size={13} /> Add deadline
+          </button>
+        </div>
       </div>
     </section>
   );

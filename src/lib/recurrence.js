@@ -185,6 +185,14 @@ export function lessonAttended(plan, date, now = new Date()) {
   return now.getHours() * 60 + now.getMinutes() >= end;
 }
 
+// Your own mark for a lesson on `date`: 'attended', 'absent', or null (not set: automatic).
+export const lessonMark = (plan, date) => (plan.absentDates?.includes(date) ? 'absent' : plan.doneDates.includes(date) ? 'attended' : null);
+
+// What a click on a lesson sets: with a mark of your own it goes back to "not set" (automatic);
+// otherwise it marks the opposite of the automatic state (a future lesson → attended, a finished
+// one → absent). So any mistake is one click away from undone.
+export const nextLessonMark = (plan, date, now = new Date()) => (lessonMark(plan, date) ? null : !lessonAttended(plan, date, now));
+
 // First date on or after `from` when the plan happens (null if none within `limit` days).
 export function nextOccurrence(plan, from, limit = 400) {
   if (!plan.repeat) return plan.date >= from ? plan.date : null;
@@ -235,6 +243,92 @@ export function weekLayout(plans, start) {
     return { date, allDay: list.filter((p) => p.hour === null), blocks };
   });
   return { days, fromHour: 0, toHour: 24, firstHour };
+}
+
+// ---- Special days (birthdays, anniversaries, holidays) --------------------------
+
+export const SPECIAL_KINDS = {
+  birthday: { label: 'Birthday', emoji: '🎂' },
+  anniversary: { label: 'Anniversary', emoji: '💍' },
+  holiday: { label: 'Holiday', emoji: '🎉' },
+  other: { label: 'Other', emoji: '⭐' },
+};
+
+// The date of special day `s` in `year` (YYYY-MM-DD), or null when it doesn't happen that year
+// (one-time days only happen in their own year). Feb 29 falls on Feb 28 in other years.
+export function specialDateIn(s, year) {
+  if (!s.yearly && s.year !== year) return null;
+  if (s.yearly && s.year && year < s.year) return null;
+  const day = s.month === 2 && s.day === 29 && daysInMonth(year, 1) < 29 ? 28 : s.day;
+  return `${year}-${pad(s.month)}-${pad(day)}`;
+}
+
+export const specialDaysOn = (list, date) => list.filter((s) => specialDateIn(s, Number(date.slice(0, 4))) === date);
+
+// How many years on `date` (a birthday's age, an anniversary's count), or null.
+export function specialYears(s, date) {
+  if (!s.yearly || !s.year) return null;
+  const n = Number(date.slice(0, 4)) - s.year;
+  return n > 0 ? n : null;
+}
+
+// "turns 52" for a birthday, "52 years" for anything else (or '' without a year).
+export function specialNote(s, date) {
+  const n = specialYears(s, date);
+  if (!n) return '';
+  return s.kind === 'birthday' ? `turns ${n}` : `${n} year${n === 1 ? '' : 's'}`;
+}
+
+// Special days from `today` up to `days` ahead: [{ special, date, inDays, note }], soonest first.
+export function upcomingSpecialDays(list, today, days = 60) {
+  const year = Number(today.slice(0, 4));
+  const end = addDays(today, days);
+  const out = [];
+  for (const s of list) {
+    for (const y of [year, year + 1]) {
+      const date = specialDateIn(s, y);
+      if (date && date >= today && date <= end) {
+        out.push({ special: s, date, inDays: daysUntil(date, today), note: specialNote(s, date) });
+        break;
+      }
+    }
+  }
+  return out.sort((a, b) => (a.date === b.date ? a.special.title.localeCompare(b.special.title) : a.date < b.date ? -1 : 1));
+}
+
+// "Today", "Tomorrow", "In 5 days".
+export const countdownLabel = (inDays) => (inDays === 0 ? 'Today' : inDays === 1 ? 'Tomorrow' : `In ${inDays} days`);
+
+// ---- Habits ---------------------------------------------------------------------
+
+// A habit is due on its chosen weekdays (every day when none are chosen), from its start date.
+export const habitDueOn = (h, date) => date >= (h.start ?? '0000-00-00') && (!h.days?.length || h.days.includes(weekday(date)));
+export const habitsOn = (habits, date) => habits.filter((h) => habitDueOn(h, date)).sort((a, b) => a.order - b.order);
+export const habitCount = (log, date, id) => log?.[date]?.[id] ?? 0;
+export const habitDone = (h, log, date) => habitCount(log, date, h.id) >= h.goal;
+
+// Current streak (due days in a row done, up to today; today only counts once done) and the best
+// streak in the last ~13 months.
+export function habitStreak(h, log, today) {
+  let current = 0;
+  let date = habitDone(h, log, today) ? today : addDays(today, -1);
+  for (let i = 0; i < 400; i++, date = addDays(date, -1)) {
+    if (!habitDueOn(h, date)) {
+      if (date < (h.start ?? today)) break;
+      continue;
+    }
+    if (!habitDone(h, log, date)) break;
+    current++;
+  }
+  let best = current;
+  let run = 0;
+  date = addDays(today, -400);
+  for (let i = 0; i <= 400; i++, date = addDays(date, 1)) {
+    if (!habitDueOn(h, date)) continue;
+    if (habitDone(h, log, date)) best = Math.max(best, ++run);
+    else if (date < today) run = 0;
+  }
+  return { current, best };
 }
 
 // ---- Homework -----------------------------------------------------------------

@@ -1,14 +1,32 @@
-// Persists the planner's data as a single JSON file.
+// Persists Cadence's data as a single JSON file.
 // Writes go to a temp file first and are then renamed over the real file,
 // so a crash mid-write can never leave a half-written data file behind.
 const fs = require('fs');
 const path = require('path');
 
-const FILE_NAME = 'planner-data.json';
+const FILE_NAME = 'cadence-data.json';
+// The app used to be called Planner; its data file is picked up (renamed) on first start.
+const LEGACY_FILE_NAME = 'planner-data.json';
 const KEEP_BACKUPS = 7;
+const BACKUP = /^(cadence|planner)-data-(\d{4}-\d{2}-\d{2})\.json$/;
+
+// Copies the data (file, daily backups, sounds) from the old "Planner" folder into a new, empty
+// data folder. The old folder is left as it is, as an extra safety copy. Returns true if copied.
+function migrateFolder(from, to) {
+  const has = (dir) => fs.existsSync(path.join(dir, FILE_NAME)) || fs.existsSync(path.join(dir, LEGACY_FILE_NAME));
+  if (!from || path.resolve(from) === path.resolve(to) || has(to) || !has(from)) return false;
+  fs.mkdirSync(to, { recursive: true });
+  for (const name of [FILE_NAME, LEGACY_FILE_NAME, 'backups', 'sounds']) {
+    const src = path.join(from, name);
+    if (fs.existsSync(src)) fs.cpSync(src, path.join(to, name), { recursive: true });
+  }
+  return true;
+}
 
 function createStorage(dir) {
   const file = path.join(dir, FILE_NAME);
+  const legacy = path.join(dir, LEGACY_FILE_NAME);
+  if (!fs.existsSync(file) && fs.existsSync(legacy)) fs.renameSync(legacy, file);
   const tmp = `${file}.tmp`;
   const backupsDir = path.join(dir, 'backups');
 
@@ -37,8 +55,8 @@ function createStorage(dir) {
   function backupDaily(today = new Date().toISOString().slice(0, 10)) {
     if (!fs.existsSync(file)) return;
     fs.mkdirSync(backupsDir, { recursive: true });
-    const target = path.join(backupsDir, `planner-data-${today}.json`);
-    if (!fs.existsSync(target)) fs.copyFileSync(file, target);
+    const target = path.join(backupsDir, `cadence-data-${today}.json`);
+    if (!fs.existsSync(target) && !fs.existsSync(path.join(backupsDir, `planner-data-${today}.json`))) fs.copyFileSync(file, target);
     const old = listBackups().slice(KEEP_BACKUPS);
     for (const name of old) fs.rmSync(path.join(backupsDir, name), { force: true });
   }
@@ -47,12 +65,12 @@ function createStorage(dir) {
     if (!fs.existsSync(backupsDir)) return [];
     return fs
       .readdirSync(backupsDir)
-      .filter((n) => /^planner-data-\d{4}-\d{2}-\d{2}\.json$/.test(n))
-      .sort()
-      .reverse();
+      .filter((n) => BACKUP.test(n))
+      // Newest first, whatever the file's old or new name.
+      .sort((a, b) => (a.match(BACKUP)[2] < b.match(BACKUP)[2] ? 1 : -1));
   }
 
   return { file, dir, backupsDir, load, save, backupDaily, listBackups };
 }
 
-module.exports = { createStorage };
+module.exports = { createStorage, migrateFolder, FILE_NAME };

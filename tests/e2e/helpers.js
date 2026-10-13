@@ -18,7 +18,7 @@ export async function launchApp(dataDir, env = {}) {
   return { app, page };
 }
 
-export const writeData = (dataDir, data) => fs.writeFileSync(path.join(dataDir, 'planner-data.json'), JSON.stringify(data));
+export const writeData = (dataDir, data) => fs.writeFileSync(path.join(dataDir, 'cadence-data.json'), JSON.stringify(data));
 
 // Drags with real pointer movements (like a person would), in small steps.
 export async function pointerDrag(page, from, to, { steps = 12 } = {}) {
@@ -28,4 +28,4 @@ export async function pointerDrag(page, from, to, { steps = 12 } = {}) {
   await page.mouse.up();
 }
 
-export const readData = (dataDir) => JSON.parse(fs.readFileSync(path.join(dataDir, 'planner-data.json'), 'utf8'));
+export const readData = (dataDir) => JSON.parse(fs.readFileSync(path.join(dataDir, 'cadence-data.json'), 'utf8'));

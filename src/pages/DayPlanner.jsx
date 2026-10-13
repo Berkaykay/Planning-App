@@ -10,6 +10,8 @@ import Check from '../components/Check.jsx';
 import Link from '../components/Link.jsx';
 import LessonStrip from '../components/LessonStrip.jsx';
 import { DeadlineItem, DueSoonBar } from '../components/deadlineActions.jsx';
+import { SpecialBanner } from '../components/specialDays.jsx';
+import { HabitsToday } from '../components/habits.jsx';
 import { usePlanActions } from '../components/planActions.jsx';
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -98,8 +100,10 @@ export default function DayPlanner({ date }) {
         <Progress done={doneCount} total={plans.length} />
       </header>
 
+      <SpecialBanner date={date} />
       <DueSoonBar date={date} />
       <LessonStrip date={date} />
+      <HabitsToday date={date} />
 
       <section className="all-day">
         <DropZone target={{ kind: 'slot', date, hour: null }} className="all-day-zone" testId="all-day-zone">

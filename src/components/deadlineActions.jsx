@@ -3,7 +3,7 @@ import { useApp } from '../context.js';
 import { newId } from '../lib/store.js';
 import { daysLeftLabel, deadlinesDueOn, dueLabel, daysUntil, homeworkFor, openDeadlines } from '../lib/recurrence.js';
 import { formatMedium, formatTime, isDateKey, parseTime } from '../lib/dates.js';
-import { Modal } from './Dialogs.jsx';
+import { Modal, useConfirmDelete } from './Dialogs.jsx';
 import Check from './Check.jsx';
 import { EditIcon, FlagIcon, TrashIcon } from './Icons.jsx';
 
@@ -97,6 +97,7 @@ function DeadlineDialog({ initial, categories, onClose }) {
 
 export function useDeadlineActions() {
   const { state, dispatch, dialogs, today, menu } = useApp();
+  const confirmDelete = useConfirmDelete();
   const actions = {
     async create(defaults = {}) {
       const values = await dialogs.open((close) => (
@@ -116,7 +117,7 @@ export function useDeadlineActions() {
       dispatch({ type: 'deadline/update', id: deadline.id, changes: { done: !deadline.done } });
     },
     async remove(deadline) {
-      const ok = await dialogs.confirm({
+      const ok = await confirmDelete({
         title: 'Delete deadline',
         message: `Delete "${deadline.title}" (due ${formatMedium(deadline.due)})?`,
         confirmLabel: 'Delete',

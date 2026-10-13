@@ -1,8 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { useApp } from '../context.js';
+import { useConfirmDelete } from './Dialogs.jsx';
 
 export function useCategoryActions() {
   const { state, dispatch, dialogs, route, navigate } = useApp();
+  const confirmDelete = useConfirmDelete();
 
   const validate = (name, excludeId) => {
     const clean = name.trim();
@@ -30,7 +32,7 @@ export function useCategoryActions() {
     },
     async remove(category) {
       const count = state.plans.filter((p) => p.categoryId === category.id).length;
-      const ok = await dialogs.confirm({
+      const ok = await confirmDelete({
         title: 'Delete category',
         message:
           count > 0

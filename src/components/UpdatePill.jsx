@@ -33,9 +33,9 @@ export default function UpdatePill() {
       <button
         className={`update-pill ${busy ? 'busy' : ''}`}
         data-testid="update-pill"
-        aria-label={busy ? `Updating to ${status.version}` : `Update to Planner ${status.version}`}
+        aria-label={busy ? `Updating to ${status.version}` : `Update to Cadence ${status.version}`}
         aria-expanded={open}
-        title={busy ? 'Updating…' : `Planner ${status.version} is available`}
+        title={busy ? 'Updating…' : `Cadence ${status.version} is available`}
         onClick={() => setOpen(!open)}
       >
         {busy ? (
@@ -52,8 +52,8 @@ export default function UpdatePill() {
         <div className="update-popover" role="dialog" aria-label="Update">
           {state === 'available' && (
             <>
-              <strong>Planner {status.version} is here ✨</strong>
-              <p className="subtle">It downloads in the background, then Planner restarts. Your plans stay as they are.</p>
+              <strong>Cadence {status.version} is here ✨</strong>
+              <p className="subtle">It downloads in the background, then Cadence restarts. Your plans stay as they are.</p>
               <div className="update-actions">
                 <button className="primary" onClick={() => updates.download()}>
                   Update and restart

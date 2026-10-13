@@ -2,7 +2,7 @@
 // tab and settings changes can't (just like a browser doesn't "undo" switching tabs).
 import { reducer } from './store.js';
 
-const UNDOABLE_KEYS = ['categories', 'plans', 'days', 'timetables', 'deadlines'];
+const UNDOABLE_KEYS = ['categories', 'plans', 'days', 'timetables', 'deadlines', 'specialDays', 'habits', 'habitLog'];
 const NOT_UNDOABLE = /^(tab\/|settings\/)/;
 const LIMIT = 50;
 

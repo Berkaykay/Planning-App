@@ -20,10 +20,9 @@ const run = (state, ...actions) => actions.reduce(reducer, state);
 const base = () => ({ ...createInitialData(), categories: [{ id: 'okul', name: 'Okul', icon: '🏫', color: '#4f9d7e' }, { id: 'gym', name: 'Gym', color: '#d0715b' }], plans: [] });
 const R = (changes = {}) => normalizeReminders({ ...changes });
 
-test('version 5 data moves to version 6 with the new settings', () => {
+test('version 5 data gets the v1.5 settings', () => {
   const s = normalizeData({ version: 5, settings: { theme: 'dark', reminders: { enabled: true, minutes: 15, lessons: true } } });
   assert.equal(s.version, DATA_VERSION);
-  assert.equal(DATA_VERSION, 6);
   assert.deepEqual(s.settings.reminders, {
     enabled: true,
     minutes: 15,

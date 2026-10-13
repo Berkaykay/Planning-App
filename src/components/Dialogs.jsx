@@ -1,4 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useApp } from '../context.js';
+
+// "Are you sure?" before deleting, unless that's turned off in Settings (Ctrl+Z still undoes).
+// Resolves true to go ahead.
+export function useConfirmDelete() {
+  const { state, dialogs } = useApp();
+  return (options) => (state.settings.confirmDeletes === false ? Promise.resolve(true) : dialogs.confirm({ confirmLabel: 'Delete', danger: true, ...options }));
+}
 
 // A tiny promise-based dialog system: `await dialogs.confirm(...)` etc.
 export function useDialogState() {

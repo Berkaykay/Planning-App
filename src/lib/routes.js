@@ -1,12 +1,20 @@
 // In-app "addresses". Every page has a path such as `day/2026-10-01`, shown in the
-// address bar as `planner://day/2026-10-01`.
+// address bar as `cadence://day/2026-10-01`. Old `planner://` addresses (the app's former name)
+// still work.
 import { isDateKey, isMonthKey, todayKey, monthOf, formatMedium, formatMonth, formatShort, weekStart } from './dates.js';
 
-export const SCHEME = 'planner://';
+export const SCHEME = 'cadence://';
 export const HOME = 'dashboard';
 
+// "cadence://day/today" (or the old "planner://…") → "day/today".
+export const stripScheme = (text) =>
+  String(text || '')
+    .trim()
+    .replace(/^(cadence|planner):\/\//i, '')
+    .replace(/^\/+|\/+$/g, '');
+
 export function parseRoute(path) {
-  const clean = String(path || '').trim().replace(SCHEME, '').replace(/^\/+|\/+$/g, '');
+  const clean = stripScheme(path);
   const [page = '', param, extra] = clean.split('/');
   if (extra !== undefined) return { page: 'notfound', path: clean };
   switch (page.toLowerCase()) {
@@ -28,6 +36,7 @@ export function parseRoute(path) {
       return param === undefined ? { page: 'categories' } : { page: 'notfound', path: clean };
     case 'timetable':
     case 'history':
+    case 'habits':
     case 'settings':
       return param === undefined ? { page: page.toLowerCase() } : { page: 'notfound', path: clean };
     case 'category':
@@ -46,6 +55,7 @@ export const paths = {
   timetable: () => 'timetable',
   history: () => 'history',
   settings: () => 'settings',
+  habits: () => 'habits',
   category: (id) => `category/${id}`,
 };
 
@@ -67,6 +77,8 @@ export function routeTitle(route, categories) {
       return 'History';
     case 'settings':
       return 'Settings';
+    case 'habits':
+      return 'Habits';
     case 'category':
       return categories.find((c) => c.id === route.id)?.name ?? 'Missing category';
     default:
@@ -75,4 +87,4 @@ export function routeTitle(route, categories) {
 }
 
 export const routeIcon = (route) =>
-  ({ dashboard: '◧', calendar: '▦', day: '☰', week: '▥', timetable: '▤', history: '↺', categories: '◉', category: '●', settings: '⚙' })[route.page] ?? '⚠';
+  ({ dashboard: '◧', calendar: '▦', day: '☰', week: '▥', timetable: '▤', history: '↺', habits: '✿', categories: '◉', category: '●', settings: '⚙' })[route.page] ?? '⚠';

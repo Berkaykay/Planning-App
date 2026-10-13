@@ -1,7 +1,7 @@
 // Ctrl+K quick search: everything you can jump to, and a simple scored match over it.
 import { formatLong, formatMedium, formatTime, isDateKey } from './dates.js';
 import { paths } from './routes.js';
-import { isLesson, nextOccurrence } from './recurrence.js';
+import { SPECIAL_KINDS, isLesson, nextOccurrence, upcomingSpecialDays } from './recurrence.js';
 
 const PAGES = [
   { label: 'Dashboard', icon: '◧', path: paths.dashboard() },
@@ -10,6 +10,7 @@ const PAGES = [
   { label: 'Week', icon: '▥', path: paths.week() },
   { label: 'Timetable', icon: '▤', path: paths.timetable(), keywords: 'lessons school' },
   { label: 'History', icon: '↺', path: paths.history(), keywords: 'past done' },
+  { label: 'Habits', icon: '✿', path: paths.habits(), keywords: 'habit tracker streak water' },
   { label: 'Categories', icon: '◉', path: paths.categories() },
   { label: 'Settings', icon: '⚙', path: paths.settings(), keywords: 'notifications sounds updates tray theme' },
 ];
@@ -17,6 +18,8 @@ const PAGES = [
 const ACTIONS = [
   { label: 'New plan…', icon: '+', command: 'new-plan', keywords: 'add create' },
   { label: 'New deadline…', icon: '⚑', command: 'new-deadline', keywords: 'add create homework due' },
+  { label: 'New special day…', icon: '★', command: 'new-special', keywords: 'add create birthday anniversary holiday' },
+  { label: 'New habit…', icon: '✿', command: 'new-habit', keywords: 'add create habit tracker' },
 ];
 
 // Every searchable thing: { id, kind, label, detail, icon, path | command, keywords }.
@@ -55,6 +58,21 @@ export function buildSearchItems(state, today) {
       done: d.done,
     });
   }
+  // Special days, on their next date.
+  for (const { special, date } of upcomingSpecialDays(state.specialDays ?? [], today, 366)) {
+    items.push({
+      id: `special:${special.id}`,
+      kind: 'special',
+      label: special.title,
+      icon: special.emoji,
+      detail: `${SPECIAL_KINDS[special.kind].label} · ${formatMedium(date)}`,
+      path: paths.calendar(date),
+      keywords: `${special.notes} ${special.kind} special day`,
+    });
+  }
+  for (const h of state.habits ?? []) {
+    items.push({ id: `habit:${h.id}`, kind: 'habit', label: h.title, icon: h.emoji || '✿', detail: 'Habit', path: paths.habits(), keywords: 'habit' });
+  }
   return items;
 }
 
@@ -72,7 +90,7 @@ function score(item, q) {
   return 0;
 }
 
-const KIND_ORDER = { action: 0, page: 1, category: 2, plan: 3, deadline: 4 };
+const KIND_ORDER = { action: 0, page: 1, category: 2, plan: 3, deadline: 4, special: 5, habit: 6 };
 
 // The best matches for `query`, at most `limit`. With no query: pages and actions. A date such
 // as 2026-10-12 adds an "Open day" result at the top.

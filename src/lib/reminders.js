@@ -1,7 +1,7 @@
 // Which notifications are due right now, and what they say. Pure: the app shows them (see
 // useReminders in App.jsx) and remembers which keys it has already shown.
 import { addDays, formatTime, formatTimeRange, parseTime, toKey } from './dates.js';
-import { isDone, isLesson, lessonAttended, plansOn } from './recurrence.js';
+import { isDone, isLesson, lessonAttended, plansOn, specialDaysOn, specialNote } from './recurrence.js';
 
 // True when `now` falls inside quiet hours. A range like 23:00–07:00 runs past midnight.
 export function inQuietHours(quiet, now) {
@@ -29,7 +29,7 @@ const categoryPrefix = (category) => (category ? `${category.icon ? `${category.
 // Notifications due at `now`: [{ key, title, body, sound }]. Plans and lessons are announced
 // `minutes` before they start (lessons only if turned on); deadlines once the day before and once
 // on the day, from 08:00.
-export function dueReminders({ plans, deadlines = [], categories = [], reminders, now = new Date() }) {
+export function dueReminders({ plans, deadlines = [], specialDays = [], categories = [], reminders, now = new Date() }) {
   if (!reminders?.enabled || inQuietHours(reminders.quiet, now)) return [];
   const date = toKey(now);
   const minutesNow = now.getHours() * 60 + now.getMinutes();
@@ -64,6 +64,29 @@ export function dueReminders({ plans, deadlines = [], categories = [], reminders
         body: `${categoryPrefix(byId.get(d.categoryId))}Due ${when}${d.hour !== null ? ` at ${formatTime(d.hour, d.minute)}` : ''}`,
         sound: r.sound,
       });
+    }
+  }
+
+  // Special days: a week before, the day before and on the day (each can be turned off), from 08:00.
+  if (now.getHours() >= 8) {
+    const checks = [
+      { when: 'onDay', date, text: 'Today' },
+      { when: 'dayBefore', date: addDays(date, 1), text: 'Tomorrow' },
+      { when: 'weekBefore', date: addDays(date, 7), text: 'In a week' },
+    ];
+    for (const { when, date: on, text } of checks) {
+      for (const s of specialDaysOn(specialDays, on)) {
+        if (!s.remind?.[when]) continue;
+        const r = categoryReminder(reminders, s.categoryId);
+        if (!r.enabled) continue;
+        const note = specialNote(s, on);
+        out.push({
+          key: `special:${s.id}:${on}:${when}`,
+          title: `${s.emoji} ${s.title}`,
+          body: `${categoryPrefix(byId.get(s.categoryId))}${text}${note ? ` · ${note}` : ''}`,
+          sound: r.sound,
+        });
+      }
     }
   }
   return out;
