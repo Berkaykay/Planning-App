@@ -19,6 +19,12 @@ contextBridge.exposeInMainWorld('planner', {
   // Recolors the window's minimize / maximize / close buttons to match the theme.
   setTitleBarColors: (colors) => ipcRenderer.send('window:titleBarOverlay', colors),
   showWindow: () => ipcRenderer.send('window:show'),
+  // Linux: 'x11' (tray popup at the tray, software rendering) or 'wayland'. Applies after a restart.
+  display: {
+    get: () => ipcRenderer.invoke('display:get'),
+    set: (mode) => ipcRenderer.invoke('display:set', mode),
+  },
+  restart: () => ipcRenderer.send('app:restart'),
   // Settings the main process acts on (tray, start at login, menu entry, automatic updates).
   applySettings: (settings) => ipcRenderer.send('app:settings', settings),
   // Commands triggered from the application menu (keyboard shortcuts).
