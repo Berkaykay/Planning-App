@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../context.js';
 import { buildSearchItems, searchItems } from '../lib/search.js';
 
-const KIND_LABEL = { page: 'Page', action: 'Action', category: 'Category', plan: 'Plan', deadline: 'Deadline' };
+const KIND_LABEL = { page: 'Page', action: 'Action', category: 'Category', plan: 'Plan', deadline: 'Deadline', special: 'Special day', habit: 'Habit' };
 
 // Ctrl+K: type to find any page, category, plan or deadline and jump to it.
 // ↑/↓ move, Enter opens, Ctrl+Enter opens in a new tab, Esc closes.

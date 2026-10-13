@@ -88,7 +88,7 @@ test('normalizeData repairs missing or malformed data', () => {
 });
 
 test('routes parse addresses', () => {
-  assert.deepEqual(parseRoute('planner://day/2026-10-01'), { page: 'day', date: '2026-10-01' });
+  assert.deepEqual(parseRoute('cadence://day/2026-10-01'), { page: 'day', date: '2026-10-01' });
   assert.deepEqual(parseRoute('calendar/2026-02'), { page: 'calendar', month: '2026-02' });
   assert.equal(parseRoute('day/2026-13-01').page, 'notfound');
   assert.equal(parseRoute('https://example.com').page, 'notfound');

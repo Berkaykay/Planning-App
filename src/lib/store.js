@@ -2,9 +2,9 @@
 // The whole object is saved to disk after every change.
 import { addDays, isDateKey, parseTime } from './dates.js';
 import { HOME } from './routes.js';
-import { FREQUENCIES, tasksOn, isDone } from './recurrence.js';
+import { FREQUENCIES, tasksOn, isDone, habitsOn, habitDone, SPECIAL_KINDS } from './recurrence.js';
 
-export const DATA_VERSION = 6;
+export const DATA_VERSION = 7;
 const MAX_HISTORY = 100;
 
 // Muted colors: categories show up as small dots and thin markers, not big colored areas.
@@ -37,6 +37,10 @@ const DEFAULT_SETTINGS = {
   updates: { auto: true },
   // Tray icon, keep running when the window is closed, start at login, applications-menu entry.
   background: { tray: false, keepRunning: false, startOnLogin: false, menuLauncher: true },
+  // "Are you sure?" before deleting things (Ctrl+Z undoes a delete either way).
+  confirmDeletes: true,
+  // When on, a day only completes itself once that day's habits are done too.
+  habitsCountForDay: false,
 };
 const MAX_CLOSED_TABS = 10;
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -58,6 +62,9 @@ export function createInitialData() {
     days: {},
     timetables: [],
     deadlines: [],
+    specialDays: [],
+    habits: [],
+    habitLog: {},
     settings: { ...DEFAULT_SETTINGS },
     session: { tabs: [tab], activeTabId: tab.id, closed: [] },
   };
@@ -122,6 +129,46 @@ export function normalizeDeadline(raw) {
     // 'weekly': checking it done adds the next one, due a week later (e.g. weekly homework).
     repeat: raw.repeat === 'weekly' ? 'weekly' : null,
     createdAt: raw.createdAt || new Date().toISOString(),
+  };
+}
+
+// A birthday, anniversary, holiday… on a month/day, every year or once (in `year`).
+// For yearly days `year` is optional and gives the age ("turns 52").
+export function normalizeSpecialDay(raw) {
+  const kind = SPECIAL_KINDS[raw.kind] ? raw.kind : 'other';
+  const month = intIn(raw.month, 1, 12) ? raw.month : 1;
+  const maxDay = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  const yearly = typeof raw.yearly === 'boolean' ? raw.yearly : true;
+  const year = intIn(raw.year, 1900, 2200) ? raw.year : null;
+  const r = raw.remind ?? {};
+  return {
+    id: raw.id || newId(),
+    title: String(raw.title ?? '').trim() || 'Special day',
+    kind,
+    emoji: typeof raw.emoji === 'string' && raw.emoji.trim() ? raw.emoji.trim().slice(0, 8) : SPECIAL_KINDS[kind].emoji,
+    month,
+    day: intIn(raw.day, 1, maxDay) ? raw.day : 1,
+    // A one-time day needs its year.
+    yearly: yearly || !year,
+    year,
+    categoryId: raw.categoryId || null,
+    notes: String(raw.notes ?? ''),
+    remind: { weekBefore: r.weekBefore !== false, dayBefore: r.dayBefore !== false, onDay: r.onDay !== false },
+  };
+}
+
+// A habit: every day or on chosen weekdays, done once or a number of times (goal) per day.
+export function normalizeHabit(raw, index = 0) {
+  const days = [...new Set((raw.days ?? []).filter((d) => intIn(d, 0, 6)))].sort();
+  return {
+    id: raw.id || newId(),
+    title: String(raw.title ?? '').trim() || 'Habit',
+    emoji: typeof raw.emoji === 'string' ? raw.emoji.trim().slice(0, 8) : '',
+    color: HEX_COLOR.test(raw.color) ? raw.color : CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+    days: days.length === 7 ? [] : days,
+    goal: intIn(raw.goal, 1, 99) ? raw.goal : 1,
+    order: Number.isFinite(raw.order) ? raw.order : index,
+    start: isDateKey(raw.start) ? raw.start : null,
   };
 }
 
@@ -247,6 +294,18 @@ export function normalizeData(raw) {
     .filter((d) => d && isDateKey(d.due))
     .map(normalizeDeadline)
     .map((d) => (d.categoryId && !categoryIds.has(d.categoryId) ? { ...d, categoryId: null } : d));
+  const specialDays = (Array.isArray(raw.specialDays) ? raw.specialDays : [])
+    .filter((x) => x && typeof x === 'object')
+    .map(normalizeSpecialDay)
+    .map((x) => (x.categoryId && !categoryIds.has(x.categoryId) ? { ...x, categoryId: null } : x));
+  const habits = (Array.isArray(raw.habits) ? raw.habits : []).filter((h) => h && typeof h === 'object').map(normalizeHabit);
+  const habitIds = new Set(habits.map((h) => h.id));
+  const habitLog = {};
+  for (const [date, counts] of Object.entries(raw.habitLog ?? {})) {
+    if (!isDateKey(date) || !counts || typeof counts !== 'object') continue;
+    const day = Object.fromEntries(Object.entries(counts).filter(([id, n]) => habitIds.has(id) && Number.isInteger(n) && n > 0));
+    if (Object.keys(day).length) habitLog[date] = day;
+  }
   const timetables = (Array.isArray(raw.timetables) ? raw.timetables : [])
     .filter((t) => t?.id && isDateKey(t.startDate))
     .map(normalizeTimetable);
@@ -262,6 +321,8 @@ export function normalizeData(raw) {
       startOnLogin: bool(b.startOnLogin, db.startOnLogin),
       menuLauncher: bool(b.menuLauncher, db.menuLauncher),
     },
+    confirmDeletes: bool(raw.settings?.confirmDeletes, DEFAULT_SETTINGS.confirmDeletes),
+    habitsCountForDay: bool(raw.settings?.habitsCountForDay, DEFAULT_SETTINGS.habitsCountForDay),
   };
   const closed = (raw.session?.closed ?? []).filter((c) => c?.tab?.id && Array.isArray(c.tab.history)).slice(-MAX_CLOSED_TABS);
   return {
@@ -271,6 +332,9 @@ export function normalizeData(raw) {
     days,
     timetables,
     deadlines,
+    specialDays,
+    habits,
+    habitLog,
     settings,
     session: { tabs, activeTabId, closed },
   };
@@ -314,8 +378,10 @@ function applyPlanChanges(plan, changes) {
 // complete exactly when all of them are done.
 function syncDay(state, date) {
   const tasks = tasksOn(state.plans, date);
-  if (!tasks.length) return state;
-  const allDone = tasks.every((p) => isDone(p, date));
+  // Habits only count when that setting is on.
+  const habits = state.settings?.habitsCountForDay ? habitsOn(state.habits ?? [], date) : [];
+  if (!tasks.length && !habits.length) return state;
+  const allDone = tasks.every((p) => isDone(p, date)) && habits.every((h) => habitDone(h, state.habitLog, date));
   if (allDone === Boolean(state.days[date]?.done)) return state;
   const days = { ...state.days };
   if (allDone) days[date] = { done: true };
@@ -385,6 +451,7 @@ export function reducer(state, action) {
         plans: state.plans.map((p) => (p.categoryId === action.id ? { ...p, categoryId: null } : p)),
         timetables: state.timetables.map((t) => (t.categoryId === action.id ? { ...t, categoryId: null } : t)),
         deadlines: state.deadlines.map((d) => (d.categoryId === action.id ? { ...d, categoryId: null } : d)),
+        specialDays: state.specialDays.map((x) => (x.categoryId === action.id ? { ...x, categoryId: null } : x)),
       };
 
     // ---- Plans ------------------------------------------------------------
@@ -427,10 +494,11 @@ export function reducer(state, action) {
       return syncDay(next, action.date);
     }
     case 'lesson/setAttended':
+      // true = attended, false = absent, null = not set (back to automatic).
       return updatePlan(state, action.id, (p) => ({
         ...p,
-        doneDates: action.attended ? withValue(p.doneDates, action.date) : without(p.doneDates, action.date),
-        absentDates: action.attended ? without(p.absentDates, action.date) : withValue(p.absentDates, action.date),
+        doneDates: action.attended === true ? withValue(p.doneDates, action.date) : without(p.doneDates, action.date),
+        absentDates: action.attended === false ? withValue(p.absentDates, action.date) : without(p.absentDates, action.date),
       }));
     case 'plan/update':
       return updatePlan(state, action.id, (p) => applyPlanChanges(p, action.changes));
@@ -513,6 +581,52 @@ export function reducer(state, action) {
     }
     case 'deadline/delete':
       return { ...state, deadlines: state.deadlines.filter((d) => d.id !== action.id) };
+
+    // ---- Special days -----------------------------------------------------
+    case 'special/add':
+      return { ...state, specialDays: [...state.specialDays, normalizeSpecialDay(action.special)] };
+    case 'special/update':
+      return { ...state, specialDays: state.specialDays.map((x) => (x.id === action.id ? normalizeSpecialDay({ ...x, ...action.changes }) : x)) };
+    case 'special/delete':
+      return { ...state, specialDays: state.specialDays.filter((x) => x.id !== action.id) };
+
+    // ---- Habits -------------------------------------------------------------
+    case 'habit/add': {
+      const order = Math.max(-1, ...state.habits.map((h) => h.order)) + 1;
+      return { ...state, habits: [...state.habits, normalizeHabit({ order, ...action.habit })] };
+    }
+    case 'habit/update':
+      return { ...state, habits: state.habits.map((h, i) => (h.id === action.id ? normalizeHabit({ ...h, ...action.changes }, i) : h)) };
+    case 'habit/delete': {
+      const habitLog = {};
+      for (const [date, counts] of Object.entries(state.habitLog)) {
+        const { [action.id]: _gone, ...rest } = counts;
+        if (Object.keys(rest).length) habitLog[date] = rest;
+      }
+      return { ...state, habits: state.habits.filter((h) => h.id !== action.id), habitLog };
+    }
+    case 'habit/move': {
+      // Swaps a habit with its neighbour (step -1 = up, 1 = down).
+      const list = [...state.habits].sort((a, b) => a.order - b.order);
+      const i = list.findIndex((h) => h.id === action.id);
+      const j = i + action.step;
+      if (i < 0 || j < 0 || j >= list.length) return state;
+      [list[i], list[j]] = [list[j], list[i]];
+      return { ...state, habits: list.map((h, order) => ({ ...h, order })) };
+    }
+    case 'habit/set': {
+      // Sets how many times a habit was done on a date (0 … its goal).
+      const habit = state.habits.find((h) => h.id === action.id);
+      if (!habit) return state;
+      const count = Math.max(0, Math.min(habit.goal, Math.round(action.count)));
+      const day = { ...(state.habitLog[action.date] ?? {}) };
+      if (count) day[action.id] = count;
+      else delete day[action.id];
+      const habitLog = { ...state.habitLog };
+      if (Object.keys(day).length) habitLog[action.date] = day;
+      else delete habitLog[action.date];
+      return syncDay({ ...state, habitLog }, action.date);
+    }
 
     // ---- Timetables -------------------------------------------------------
     case 'timetable/save': {

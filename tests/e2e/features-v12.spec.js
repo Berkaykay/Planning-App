@@ -50,7 +50,7 @@ test('lessons are shown separately and never count as plans', async () => {
   data = reducer(data, { type: 'plan/add', plan: { id: 'hw', title: 'Homework', date: monday, categoryId: 'school' } });
   await start(data);
 
-  await goTo(`planner://day/${monday}`);
+  await goTo(`cadence://day/${monday}`);
   const lessons = page.getByTestId('lessons');
   await expect(lessons.getByRole('checkbox')).toHaveCount(2);
   await expect(page.getByTestId('plan')).toHaveCount(1);
@@ -277,7 +277,7 @@ test('backups: export, import, daily copies, and data from a newer version is pr
     PLANNER_TEST_IMPORT_PATH: exportPath,
   });
   // A daily copy was made when the app started.
-  expect(fs.readdirSync(path.join(dataDir, 'backups')).some((n) => n.startsWith('planner-data-'))).toBe(true);
+  expect(fs.readdirSync(path.join(dataDir, 'backups')).some((n) => n.startsWith('cadence-data-'))).toBe(true);
 
   await sidebar().getByRole('link', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Export backup…' }).click();
@@ -298,14 +298,14 @@ test('backups: export, import, daily copies, and data from a newer version is pr
   // Data saved by a future version is shown but never overwritten by this one.
   const future = { ...readData(dataDir), version: 99 };
   writeData(dataDir, future);
-  const before = fs.readFileSync(path.join(dataDir, 'planner-data.json'), 'utf8');
+  const before = fs.readFileSync(path.join(dataDir, 'cadence-data.json'), 'utf8');
   ({ app, page } = await launchApp(dataDir));
   await expect(page.getByText('saved by a newer version')).toBeVisible();
   await sidebar().getByRole('link', { name: 'Dashboard' }).click();
   await page.getByLabel('Add a plan for today').fill('Should not be saved');
   await page.getByLabel('Add a plan for today').press('Enter');
   await page.waitForTimeout(500);
-  expect(fs.readFileSync(path.join(dataDir, 'planner-data.json'), 'utf8')).toBe(before);
+  expect(fs.readFileSync(path.join(dataDir, 'cadence-data.json'), 'utf8')).toBe(before);
 });
 
 test('dashboard shows categories as tiles and hides empty routines', async () => {

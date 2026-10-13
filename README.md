@@ -1,6 +1,6 @@
-# Planning-App
+# Cadence
 
-A desktop planning app made by AI to help me plan things. It navigates like a browser, with tabs, back/forward buttons and an address bar, but it only moves between its own pages. It never loads websites.
+A desktop planner made by AI to help me plan things (it used to be called *Planner*). It navigates like a browser, with tabs, back/forward buttons and an address bar, but it only moves between its own pages. It never loads websites.
 
 Built with **Electron + React** (bundled by Vite). All data is saved locally in a single JSON file.
 
@@ -13,14 +13,16 @@ Built with **Electron + React** (bundled by Vite). All data is saved locally in 
 
 | Your computer | File to download |
 | --- | --- |
-| Windows 10 / 11 | `Planner-Setup-<version>.exe` |
-| Linux (Nobara, Fedora, Ubuntu…) | `Planner-<version>-linux.AppImage` |
+| Windows 10 / 11 | `Cadence-Setup-<version>.exe` |
+| Linux (Nobara, Fedora, Ubuntu…) | `Cadence-<version>-linux.AppImage` |
 
 (The `latest*.yml` and `.blockmap` files are for the in-app updater; you don't need them.)
 
 3. Open it:
-   - **Windows:** double-click the Setup file. It installs in a few seconds and adds a **Planner** shortcut to your desktop and Start menu. The app isn't code-signed, so Windows may show *"Windows protected your PC"*: click **More info** → **Run anyway**.
-   - **Linux:** make the file executable (`chmod +x Planner-*.AppImage`) and run it. Planner then adds itself to your applications menu with its icon, so next time you can start it from there (and pin it to the taskbar). Keep the AppImage somewhere permanent, such as `~/Applications`; if you move it, Planner updates the menu entry the next time it starts. On Ubuntu 22.04 and newer, if it doesn't start, install FUSE (`sudo apt install libfuse2t64`, or `libfuse2` on 22.04) or start it with `--no-sandbox`.
+   - **Windows:** double-click the Setup file. It installs in a few seconds and adds a **Cadence** shortcut to your desktop and Start menu. The app isn't code-signed, so Windows may show *"Windows protected your PC"*: click **More info** → **Run anyway**.
+   - **Linux:** make the file executable (`chmod +x Cadence-*.AppImage`) and run it. Cadence then adds itself to your applications menu with its icon, so next time you can start it from there (and pin it to the taskbar). Keep the AppImage somewhere permanent, such as `~/Applications`; if you move it, Cadence updates the menu entry the next time it starts. On Ubuntu 22.04 and newer, if it doesn't start, install FUSE (`sudo apt install libfuse2t64`, or `libfuse2` on 22.04) or start it with `--no-sandbox`.
+
+**Coming from Planner?** Cadence picks up your data automatically on first start (from the old `Planner` data folder; the old folder is left as a backup), and replaces the old menu entry.
 
 **Updates install themselves (from 1.5 on):** when a new version is out, a small **↑ 1.5.1**-style button appears at the top right of the window. Click it and choose **Update and restart**. Your plans are stored separately from the app, so they're kept as they are. See [Where your data is stored](#where-your-data-is-stored).
 
@@ -42,13 +44,13 @@ The [Build installers](.github/workflows/build.yml) GitHub Action builds and tes
 ## Features
 
 **Browser-style navigation**
-- The tab strip is the window's title bar, like a browser: the Planner icon, your tabs and `+`, then empty space you can drag the window by, with minimize / maximize / close on the right. There's no menu bar (Alt doesn't pop one up), but all the keyboard shortcuts below still work.
+- The tab strip is the window's title bar, like a browser: the Cadence mark, your tabs and `+`, then empty space you can drag the window by, with minimize / maximize / close on the right. There's no menu bar (Alt doesn't pop one up), but all the keyboard shortcuts below still work.
 - Tabs: `+` or **Ctrl+T** opens a tab, **Ctrl+W** or middle-click closes one, **Ctrl+Shift+T** reopens the last closed tab, and **Ctrl+Tab** / **Ctrl+Shift+Tab** switches between them.
 - Drag a tab along the tab strip to reorder it; the other tabs slide out of the way.
 - Right-click a tab for more options: *New tab to the right*, *Duplicate*, *Pin* (pinned tabs shrink to an icon and stay on the left), *Close other tabs*, *Close tabs to the right* and *Reopen closed tab*.
 - Each tab has its own back/forward history. Use the ← → buttons, **Alt+←/→**, or the mouse side buttons.
 - **Ctrl+K** opens **quick search**: type to find any page, category, plan or deadline (or type a date like `2026-10-12`), then **Enter** to open it or **Ctrl+Enter** to open it in a new tab.
-- The address bar shows the page you're on, such as `planner://day/2026-10-01`, and you can type an address to go there. Addresses: `planner://dashboard`, `planner://calendar/2026-10` (or `planner://calendar/2026-10-01` to select a day), `planner://day/today`, `planner://timetable`, `planner://categories`.
+- The address bar shows the page you're on, such as `cadence://day/2026-10-01`, and you can type an address to go there. Addresses: `cadence://dashboard`, `cadence://calendar/2026-10` (or `cadence://calendar/2026-10-01` to select a day), `cadence://day/today`, `cadence://timetable`, `cadence://habits`, `cadence://categories`. Old `planner://` addresses still work.
 - **Ctrl+click** or middle-click any link or calendar day to open it in a background tab.
 - **Ctrl+1–4** jump to Dashboard, Calendar, today's Day Planner and Categories. **Ctrl+L** focuses the address bar.
 - Your open tabs, their order and their history are restored when you reopen the app.
@@ -102,19 +104,32 @@ For school lessons (or any fixed weekly schedule), open **Timetable** in the sid
 2. Type each subject into the **Mon–Fri grid**. Press **Enter** to jump to the cell below, and subjects you've typed before are suggested. The ⧉ button next to a day copies the previous day's lessons. Tick **Include Saturday** if you have Saturday lessons.
 3. Optionally set when the term **ends**, then click **Save timetable**.
 
-Each filled cell becomes a weekly lesson in the *School* category, created automatically. Lessons aren't counted as plans: they appear in their own **Lessons** strip on the Day Planner, Dashboard and Calendar, with their times (such as 08:30–09:10). Lessons tick themselves once they're over, so you don't have to check them one by one. If you skipped one, click it (or right-click → *Mark absent*); this doesn't change your plan progress. The category's sidebar count and its Dashboard tile include its lessons. You can come back and change the timetable at any time: saving again updates your lessons but keeps the check marks you already made. **Delete timetable** removes all its lessons.
+Each filled cell becomes a weekly lesson in the *School* category, created automatically. Lessons aren't counted as plans: they appear in their own **Lessons** strip on the Day Planner, Dashboard and Calendar, with their times (such as 08:30–09:10). Lessons tick themselves once they're over, so you don't have to check them one by one. Click a lesson to set it yourself, and click again to go back to automatic (*not set*): a finished lesson goes attended → absent → attended, a lesson still to come goes not set → attended → not set. Right-click for *Attended*, *Absent* or *Not set (automatic)*. None of this changes your plan progress. The category's sidebar count and its Dashboard tile include its lessons. You can come back and change the timetable at any time: saving again updates your lessons but keeps the check marks you already made. **Delete timetable** removes all its lessons.
 
 **Theme**: the switch at the bottom of the sidebar chooses **Light**, **Dark** or **System** (follows your computer's setting).
 
 **Right-click menus**:
 - **Plans:** done/not done, edit, duplicate, copy to tomorrow / to a date / to every day this week, move to today / tomorrow, change category, delete, undo.
-- **Calendar and week days:** open, open in a new tab, add a plan, add a deadline, mark the day complete.
-- **Lessons:** attended / absent, add homework.
+- **Calendar and week days:** open, open in a new tab, add a plan, add a deadline, add a special day, mark the day complete.
+- **Lessons:** attended / absent / not set, add homework.
 - **Categories in the sidebar:** open in a new tab, rename, customize, delete.
 - **Tabs:** see above.
 - **Text fields:** cut, copy, paste.
 
 **Undo**: **Ctrl+Z** undoes the last change to your plans, such as completing, deleting, moving or importing, and **Ctrl+Shift+Z** (or **Ctrl+Y**) redoes it. *Undo* is also in the right-click menus.
+
+**Ask before deleting**: Settings → General. Turn it off to delete plans, deadlines, special days, habits and categories without an "Are you sure?" (Ctrl+Z still brings them back).
+
+**Special days**: birthdays, anniversaries, holidays and other days to remember. They are not plans: nothing to check off, and they never count toward a day's progress.
+- Add one by right-clicking a day in the Calendar or Week view (*Add special day…*), with **★ Special day** in the Calendar's day panel or on the Dashboard, or Ctrl+K → *New special day…*.
+- Pick a type (🎂 birthday, 💍 anniversary, 🎉 holiday, ⭐ other; the emoji can be changed), the date, and whether it repeats **every year**. With the year of birth in the date, it shows the age: *Mom's birthday · turns 52*.
+- It shows as a little **ticket** on the bottom-right of its day in the Calendar, as a banner on that day in the Day Planner, as an emoji in the Week view and the This-week strip, and in the Dashboard's **Coming up** card with a countdown.
+- Reminders a week before, the day before and on the day (each can be turned off).
+
+**Habits** (sidebar → Habits): small things you want to do regularly, kept apart from plans.
+- A habit can be every day or only on some weekdays (gym on Mon/Wed/Fri), and either a simple tick or a **count** (water 0/8, one tap per glass; right-click for one less).
+- The Habits page has a month grid to tick off days, with your current and best **streak** 🔥. The Dashboard's **Habits today** card and the Day Planner's Habits strip let you tap them off quickly.
+- *Count habits toward a complete day* (off by default) makes a day complete itself only once its habits are done too.
 
 **Notifications**: a desktop notification before a timed plan starts (10 minutes by default) and for deadlines the day before and on the day. It shows the plan and its category, such as *Math prep — 🏫 Okul · 14:00 · starts in 10 min*. In **Settings → Notifications** you can:
 - choose how long before, and whether lessons get reminders too;
@@ -123,7 +138,7 @@ Each filled cell becomes a weekly lesson in the *School* category, created autom
 - set **quiet hours** (for example 23:00–07:00) when nothing plays or pops up.
 
 **Tray and background** (Settings → Tray and background, all off by default):
-- **Show Planner in the system tray.** Click the tray icon for a small view of today: your progress, what's up next, today's plans to check off, lessons and deadlines, and a box to add a plan. Right-click it for *Open Planner* and *Quit*. On GNOME the tray needs the AppIndicator extension; KDE shows it directly.
+- **Show Cadence in the system tray.** Click the tray icon and a small "today" window slides out of the tray corner: your progress, what's up next, today's plans to check off with a quick-add box and *Add deadline*, lessons, deadlines, upcoming special days, a **Tomorrow** preview and a 25-minute **focus timer** (it keeps running when the popup is closed and notifies you at the end). **Open Cadence** is at its top left. Right-click the tray icon for *Open Cadence* and *Quit*. On GNOME the tray needs the AppIndicator extension; KDE shows it directly. (On Linux, Cadence runs through XWayland so it can place this popup; start it with `CADENCE_WAYLAND=1` to run natively on Wayland.)
   <img src="docs/tray-popup.png" alt="Tray popup" width="300">
 - **Keep running when the window is closed**, so reminders and sounds keep working; open the window again from the tray.
 - **Start when I log in** (quietly into the tray).
@@ -132,18 +147,18 @@ Each filled cell becomes a weekly lesson in the *School* category, created autom
 
 ## Where your data is stored
 
-Everything is saved immediately after each change to `planner-data.json` in the app's data folder:
+Everything is saved immediately after each change to `cadence-data.json` in the app's data folder:
 
 | OS      | Location                                        |
 | ------- | ----------------------------------------------- |
-| Windows | `%APPDATA%\Planner\planner-data.json`           |
-| Linux   | `~/.config/Planner/planner-data.json`           |
+| Windows | `%APPDATA%\Cadence\cadence-data.json`           |
+| Linux   | `~/.config/Cadence/cadence-data.json`           |
 
 - **Updates keep your data:** the file lives outside the app, so new versions simply keep using it.
 - **Your sounds** are copied into the `sounds` folder next to the data file.
 - **Daily backups:** each day the app starts, it saves a copy in the `backups` folder next to the data file and keeps the last 7 days.
 - **Export/Import:** **Settings → Export backup…** saves everything to a file of your choice; **Import backup…** loads one back (and can be undone with Ctrl+Z).
-- **Safe with older versions:** if an older version of Planner opens data saved by a newer one, it shows it but doesn't overwrite it.
+- **Safe with older versions:** if an older version of Cadence opens data saved by a newer one, it shows it but doesn't overwrite it.
 - **Crash-safe writes:** the app writes a temporary file and then renames it, so a crash can't corrupt your data.
 
 To use a different folder, set the `PLANNER_DATA_DIR` environment variable.
@@ -181,7 +196,7 @@ electron/        main process: window, menu/shortcuts, JSON storage (storage.cjs
 src/mini/        the tray popup ("today at a glance")
 src/lib/         pure logic: dates, recurrence rules, routes, state reducer, undo history
 src/components/  tabs, nav bar, sidebar, plan item, dialogs, shared plan/category actions
-src/pages/       Dashboard, Calendar, DayPlanner, Week, Timetable, History, Categories, CategoryPage, Settings, NotFound
+src/pages/       Dashboard, Calendar, DayPlanner, Week, Timetable, History, Habits, Categories, CategoryPage, Settings, NotFound
 tests/unit/      node:test unit tests
 tests/e2e/       Playwright tests against the Electron app
 ```
@@ -189,6 +204,7 @@ tests/e2e/       Playwright tests against the Electron app
 ![Calendar](docs/calendar.png)
 ![Day Planner](docs/day-planner.png)
 ![Week](docs/week.png)
+![Habits](docs/habits.png)
 ![Category page](docs/category.png)
 ![History](docs/history.png)
 ![Timetable](docs/timetable.png)

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context.js';
-import { lessonsOn, lessonAttended } from '../lib/recurrence.js';
+import { lessonsOn, lessonAttended, lessonMark, nextLessonMark } from '../lib/recurrence.js';
 import { formatTimeRange } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
 import Link from './Link.jsx';
@@ -53,20 +53,28 @@ export default function LessonStrip({ date, compact = false }) {
       <div className="lesson-list">
         {lessons.map((p) => {
           const done = lessonAttended(p, date, now);
-          const absent = p.absentDates?.includes(date);
+          const mark = lessonMark(p, date);
+          const absent = mark === 'absent';
           return (
             <button
               key={p.id}
-              className={`lesson ${done ? 'done' : ''} ${absent ? 'absent' : ''}`}
+              className={`lesson ${done ? 'done' : ''} ${absent ? 'absent' : ''} ${mark ? 'marked' : ''}`}
               role="checkbox"
               aria-checked={done}
               aria-label={`${p.title} ${formatTimeRange(p)}`}
-              title={done ? 'Attended. Click if you were absent' : absent ? 'Absent. Click to mark attended' : 'Click to mark attended'}
-              onClick={() => set(p, !done)}
+              title={
+                mark
+                  ? `${mark === 'attended' ? 'Attended' : 'Absent'} (set by you). Click to go back to automatic`
+                  : done
+                    ? 'Attended (automatic). Click if you were absent'
+                    : 'Not set yet (ticks itself when it ends). Click to mark attended'
+              }
+              onClick={() => set(p, nextLessonMark(p, date, now))}
               onContextMenu={(e) =>
                 menu.open(e, [
-                  { label: 'Mark attended', checked: done, onSelect: () => set(p, true) },
-                  { label: 'Mark absent', checked: Boolean(absent), onSelect: () => set(p, false) },
+                  { label: 'Attended', checked: mark === 'attended', onSelect: () => set(p, true) },
+                  { label: 'Absent', checked: mark === 'absent', onSelect: () => set(p, false) },
+                  { label: 'Not set (automatic)', checked: !mark, onSelect: () => set(p, null) },
                   null,
                   { label: 'Add homework…', onSelect: () => deadlineActions.homework(p, date) },
                   { label: 'Open Timetable', onSelect: () => navigate(paths.timetable()) },

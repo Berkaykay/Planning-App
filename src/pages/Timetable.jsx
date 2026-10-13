@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../context.js';
+import { useConfirmDelete } from '../components/Dialogs.jsx';
 import { newId, normalizeTimetable } from '../lib/store.js';
 import { minutesToTime, parseTime, WEEKDAY_NAMES } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
@@ -43,6 +44,7 @@ function signature(t) {
 // Weekly school timetable: type subjects into a grid once and they repeat every week.
 export default function Timetable() {
   const { state, dispatch, dialogs, today } = useApp();
+  const confirmDelete = useConfirmDelete();
   const saved = state.timetables[0] ?? null;
   const [draft, setDraft] = useState(() => draftFrom(saved, state.categories, today));
   const [error, setError] = useState('');
@@ -141,7 +143,7 @@ export default function Timetable() {
   };
 
   const remove = async () => {
-    const ok = await dialogs.confirm({
+    const ok = await confirmDelete({
       title: 'Delete timetable',
       message: `Delete "${saved.name}" and all its lessons from your calendar, including their check marks?`,
       confirmLabel: 'Delete',

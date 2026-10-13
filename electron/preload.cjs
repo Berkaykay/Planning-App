@@ -44,5 +44,8 @@ contextBridge.exposeInMainWorld('planner', {
     command: (command) => ipcRenderer.send('mini:command', command),
     hide: () => ipcRenderer.send('mini:hide'),
     ready: () => ipcRenderer.send('mini:ready'),
+    onShown: (callback) => listen('mini:shown', callback),
+    onFocus: (callback) => listen('mini:focus', callback),
+    focus: (action) => ipcRenderer.send('focus:action', action),
   },
 });

@@ -37,7 +37,7 @@ const center = async (locator) => {
 
 test('day planner scrolls as one page, and you can scroll with the wheel while dragging a plan', async () => {
   await start(normalizeData({ plans: [P({ id: 'a', title: 'Night owl', date: today, hour: 1 })] }));
-  await goTo(`planner://day/${today}`);
+  await goTo(`cadence://day/${today}`);
   // The hours are part of the page, not a separate scroll box.
   const grid = page.locator('.hour-grid');
   expect(await grid.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);

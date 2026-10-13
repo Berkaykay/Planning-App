@@ -51,7 +51,7 @@ test('create, rename, select and delete categories from the sidebar', async () =
   // Selecting a category opens its page and highlights it.
   await sidebar().getByRole('link', { name: /Learning/ }).click();
   await expect(page.getByTestId('page').getByRole('heading', { level: 1 })).toHaveText('Learning');
-  await expect(page.getByLabel('Address')).toHaveValue(/^planner:\/\/category\//);
+  await expect(page.getByLabel('Address')).toHaveValue(/^cadence:\/\/category\//);
   await expect(page.getByTestId('category-row').filter({ hasText: 'Learning' })).toHaveClass(/selected/);
 
   // A plan assigned to the category is kept (uncategorized) when the category is deleted.
@@ -235,31 +235,31 @@ test('browser-like tabs, history and address bar', async () => {
   await sidebar().getByRole('link', { name: 'Calendar' }).click();
   await sidebar().getByRole('link', { name: 'Categories' }).click();
   await page.getByRole('button', { name: 'Back' }).click();
-  await expect(page.getByLabel('Address')).toHaveValue('planner://calendar');
+  await expect(page.getByLabel('Address')).toHaveValue('cadence://calendar');
   await page.getByRole('button', { name: 'Forward' }).click();
-  await expect(page.getByLabel('Address')).toHaveValue('planner://categories');
+  await expect(page.getByLabel('Address')).toHaveValue('cadence://categories');
   await page.keyboard.press('Alt+ArrowLeft');
-  await expect(page.getByLabel('Address')).toHaveValue('planner://calendar');
+  await expect(page.getByLabel('Address')).toHaveValue('cadence://calendar');
 
   // New tab has its own history.
   await page.getByRole('button', { name: 'New tab' }).click();
   await expect(tabs).toHaveCount(2);
   await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByLabel('Address')).toHaveValue('planner://dashboard');
+  await expect(page.getByLabel('Address')).toHaveValue('cadence://dashboard');
   await expect(page.getByRole('button', { name: 'Back' })).toBeDisabled();
 
   // Typing an address navigates.
-  await page.getByLabel('Address').fill('planner://day/2026-12-25');
+  await page.getByLabel('Address').fill('cadence://day/2026-12-25');
   await page.getByLabel('Address').press('Enter');
   await expect(page.getByTestId('day-heading')).toHaveText('Friday, December 25, 2026');
   await expect(tabs.nth(1)).toContainText('Fri, Dec 25');
-  await page.getByLabel('Address').fill('planner://nowhere');
+  await page.getByLabel('Address').fill('cadence://nowhere');
   await page.getByLabel('Address').press('Enter');
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
 
   // Switching back to the first tab restores its page.
   await tabs.nth(0).click();
-  await expect(page.getByLabel('Address')).toHaveValue('planner://calendar');
+  await expect(page.getByLabel('Address')).toHaveValue('cadence://calendar');
 
   // Ctrl+click on a calendar day opens it in a background tab.
   await page.getByTestId(`cell-${todayKey()}`).click({ modifiers: ['Control'] });
@@ -300,7 +300,7 @@ test('everything persists after closing and reopening the app', async () => {
 
   ({ app, page } = await launchApp(dataDir));
   await expect(page.getByTestId('tab')).toHaveCount(2);
-  await expect(page.getByLabel('Address')).toHaveValue('planner://calendar');
+  await expect(page.getByLabel('Address')).toHaveValue('cadence://calendar');
   await expect(sidebar().getByRole('link', { name: /Garden/ })).toBeVisible();
   await page.getByTestId('tab').nth(0).click();
   await expect(page.getByTestId('day-heading')).toHaveText(formatLong(todayKey()));
@@ -309,5 +309,5 @@ test('everything persists after closing and reopening the app', async () => {
   await expect(page.getByRole('checkbox', { name: 'Mark whole day complete' })).toHaveAttribute('aria-checked', 'true');
   // Back history survives the restart too.
   await page.getByRole('button', { name: 'Back' }).click();
-  await expect(page.getByLabel('Address')).toHaveValue('planner://dashboard');
+  await expect(page.getByLabel('Address')).toHaveValue('cadence://dashboard');
 });

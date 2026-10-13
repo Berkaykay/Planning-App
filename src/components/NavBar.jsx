@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context.js';
 import { activeTab } from '../lib/store.js';
-import { SCHEME, HOME } from '../lib/routes.js';
+import { SCHEME, HOME, stripScheme } from '../lib/routes.js';
 import { usePlanActions } from './planActions.jsx';
 
 export default function NavBar({ addressRef }) {
@@ -14,7 +14,7 @@ export default function NavBar({ addressRef }) {
 
   const submit = (e) => {
     e.preventDefault();
-    const target = address.trim().replace(SCHEME, '').replace(/^\/+|\/+$/g, '') || HOME;
+    const target = stripScheme(address) || HOME;
     navigate(target);
     setAddress(SCHEME + target);
     addressRef.current?.blur();

@@ -78,7 +78,7 @@ test('timetable: set up weekly lessons once, they repeat with their own check ma
   // Lessons show in their own strip, not as plans.
   const lesson = (title) => page.getByTestId('lessons').getByRole('checkbox', { name: new RegExp(`^${title} `) });
   const monday = nextMonday();
-  await goTo(`planner://day/${monday}`);
+  await goTo(`cadence://day/${monday}`);
   await expect(lesson('Math')).toContainText('08:30–09:10');
   await expect(lesson('Physics')).toContainText('09:20–10:00');
   await expect(page.getByTestId('plan')).toHaveCount(0);
@@ -86,10 +86,10 @@ test('timetable: set up weekly lessons once, they repeat with their own check ma
   await expect(lesson('Math')).toHaveAttribute('aria-checked', 'true');
 
   // The next Monday has the same lessons, unchecked.
-  await goTo(`planner://day/${addDays(monday, 7)}`);
+  await goTo(`cadence://day/${addDays(monday, 7)}`);
   await expect(lesson('Math')).toHaveAttribute('aria-checked', 'false');
   // Tuesday has its own lessons.
-  await goTo(`planner://day/${addDays(monday, 1)}`);
+  await goTo(`cadence://day/${addDays(monday, 1)}`);
   await expect(lesson('History')).toBeVisible();
   await expect(lesson('Physics')).toHaveCount(0);
 
@@ -99,7 +99,7 @@ test('timetable: set up weekly lessons once, they repeat with their own check ma
   await page.getByLabel('Mon lesson 2').fill('Chemistry');
   await expect(page.getByText('unsaved changes')).toBeVisible();
   await page.getByRole('button', { name: 'Save timetable' }).click();
-  await goTo(`planner://day/${monday}`);
+  await goTo(`cadence://day/${monday}`);
   await expect(lesson('Math')).toHaveAttribute('aria-checked', 'true');
   await expect(lesson('Chemistry')).toBeVisible();
   await expect(lesson('Physics')).toHaveCount(0);
@@ -108,7 +108,7 @@ test('timetable: set up weekly lessons once, they repeat with their own check ma
   await sidebar().getByRole('link', { name: 'Timetable' }).click();
   await page.getByRole('button', { name: 'Delete timetable' }).click();
   await dialog().getByRole('button', { name: 'Delete' }).click();
-  await goTo(`planner://day/${monday}`);
+  await goTo(`cadence://day/${monday}`);
   await expect(page.getByTestId('lessons')).toHaveCount(0);
   expect(readData(dataDir).timetables).toEqual([]);
 });
@@ -141,7 +141,7 @@ test('calendar: selecting a day shows its plans beside the calendar, with month 
   await panel.getByRole('textbox').fill('Dentist');
   await panel.getByRole('textbox').press('Enter');
   await expect(panel.getByTestId('plan')).toContainText('Dentist');
-  await expect(page.getByLabel('Address')).toHaveValue(/^planner:\/\/calendar/);
+  await expect(page.getByLabel('Address')).toHaveValue(/^cadence:\/\/calendar/);
 
   // Double-click opens the Day Planner.
   await page.getByTestId(`cell-${other}`).dblclick();

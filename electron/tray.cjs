@@ -3,11 +3,14 @@
 // its changes back through the main window, so there is only ever one place that changes data.
 const { BrowserWindow, Menu, Tray, nativeImage, screen } = require('electron');
 const path = require('path');
+const { popupPosition } = require('./popupPosition.cjs');
 
 const ICON = path.join(__dirname, 'icon.png');
-const MINI = { width: 340, height: 540 };
+const MINI = { width: 380, height: 640 };
+// The focus timer's length; the tests make it a few seconds.
+const FOCUS_SECONDS = Number(process.env.CADENCE_TEST_FOCUS_SECONDS) || 25 * 60;
 
-function createTray({ loadPage, preload, backgroundColor, openMain, quit, getData }) {
+function createTray({ loadPage, preload, backgroundColor, openMain, quit, getData, onFocusDone }) {
   // Under the automated tests there's no tray host; they drive the popup through toggleMini().
   const fake = process.env.PLANNER_TEST_FAKE_TRAY === '1';
   let tray = null;
@@ -22,10 +25,12 @@ function createTray({ loadPage, preload, backgroundColor, openMain, quit, getDat
       resizable: false,
       minimizable: false,
       maximizable: false,
+      // It belongs to the tray: it can't be dragged away.
+      movable: false,
       fullscreenable: false,
       skipTaskbar: true,
       alwaysOnTop: true,
-      title: 'Planner — Today',
+      title: 'Cadence — Today',
       icon: ICON,
       backgroundColor: backgroundColor(),
       webPreferences: { preload, contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
@@ -43,18 +48,43 @@ function createTray({ loadPage, preload, backgroundColor, openMain, quit, getDat
     return mini;
   };
 
-  // Next to the tray icon when the system tells us where it is (Windows); otherwise near the
-  // pointer (Linux), always kept inside the screen's work area.
+  // Against the panel, at the tray icon (its real position on Windows; on Linux the system doesn't
+  // say, so the tray end of the panel). Returns the panel's side for the slide-out animation.
   const place = (win) => {
-    const bounds = tray?.getBounds?.();
-    const anchor = bounds && bounds.width > 0 ? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 } : screen.getCursorScreenPoint();
-    const area = screen.getDisplayNearestPoint(anchor).workArea;
-    const below = anchor.y < area.y + area.height / 2;
-    let x = Math.round(anchor.x - MINI.width / 2);
-    let y = below ? anchor.y + 16 : anchor.y - MINI.height - 16;
-    x = Math.min(Math.max(x, area.x + 8), area.x + area.width - MINI.width - 8);
-    y = Math.min(Math.max(y, area.y + 8), area.y + area.height - MINI.height - 8);
-    win.setPosition(x, Math.round(y));
+    const bounds = tray?.getBounds?.() ?? null;
+    const display = bounds && bounds.width > 0 ? screen.getDisplayMatching(bounds) : screen.getPrimaryDisplay();
+    const { x, y, side } = popupPosition(display, bounds, MINI);
+    win.setPosition(x, y);
+    return side;
+  };
+
+  // ---- Focus timer (lives here so it keeps running while the popup is closed) ----
+  let focus = { duration: FOCUS_SECONDS, remaining: FOCUS_SECONDS, endsAt: null, done: false };
+  let focusTimer = null;
+  const sendFocus = () => mini?.webContents.send('mini:focus', { ...focus, now: Date.now() });
+  const focusAction = ({ type, minutes }) => {
+    if (type === 'get') return sendFocus();
+    const now = Date.now();
+    clearTimeout(focusTimer);
+    if (type === 'start' && !focus.endsAt) {
+      if (focus.done || focus.remaining <= 0) focus = { ...focus, remaining: focus.duration, done: false };
+      focus = { ...focus, endsAt: now + focus.remaining * 1000 };
+    } else if (type === 'pause' && focus.endsAt) {
+      focus = { ...focus, remaining: Math.max(0, Math.round((focus.endsAt - now) / 1000)), endsAt: null };
+    } else if (type === 'reset') {
+      focus = { duration: FOCUS_SECONDS, remaining: FOCUS_SECONDS, endsAt: null, done: false };
+    } else if (type === 'add') {
+      const extra = (minutes ?? 5) * 60;
+      focus = focus.endsAt ? { ...focus, endsAt: focus.endsAt + extra * 1000 } : { ...focus, remaining: focus.remaining + extra, done: false };
+    }
+    if (focus.endsAt) {
+      focusTimer = setTimeout(() => {
+        focus = { ...focus, remaining: 0, endsAt: null, done: true };
+        sendFocus();
+        onFocusDone?.();
+      }, focus.endsAt - now);
+    }
+    sendFocus();
   };
 
   const sendState = () => {
@@ -64,10 +94,13 @@ function createTray({ loadPage, preload, backgroundColor, openMain, quit, getDat
 
   const showMini = () => {
     const win = mini ?? createMini();
-    place(win);
+    const side = place(win);
     win.show();
     win.focus();
     sendState();
+    sendFocus();
+    // Plays the "comes out of the tray" animation from the panel's side.
+    win.webContents.send('mini:shown', { side });
   };
 
   const toggleMini = () => (mini?.isVisible() ? mini.hide() : showMini());
@@ -75,9 +108,9 @@ function createTray({ loadPage, preload, backgroundColor, openMain, quit, getDat
   const menu = () =>
     Menu.buildFromTemplate([
       { label: 'Today at a glance', click: showMini },
-      { label: 'Open Planner', click: openMain },
+      { label: 'Open Cadence', click: openMain },
       { type: 'separator' },
-      { label: 'Quit Planner', click: quit },
+      { label: 'Quit Cadence', click: quit },
     ]);
 
   const enable = (on) => {
@@ -94,7 +127,7 @@ function createTray({ loadPage, preload, backgroundColor, openMain, quit, getDat
     try {
       const size = process.platform === 'win32' ? 16 : 24;
       tray = new Tray(nativeImage.createFromPath(ICON).resize({ width: size, height: size, quality: 'best' }));
-      tray.setToolTip('Planner');
+      tray.setToolTip('Cadence');
       tray.setContextMenu(menu());
       tray.on('click', toggleMini);
     } catch (err) {
@@ -112,6 +145,8 @@ function createTray({ loadPage, preload, backgroundColor, openMain, quit, getDat
     showMini,
     hideMini: () => mini?.hide(),
     sendState,
+    sendFocus,
+    focusAction,
     miniWindow: () => mini,
   };
 }

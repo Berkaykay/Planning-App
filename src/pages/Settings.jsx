@@ -30,7 +30,7 @@ export default function Settings() {
     const result = await importData();
     if (!result) return setMessage('Import cancelled.');
     if (result.error || !Array.isArray(result.data?.plans)) {
-      return setMessage(result.error ?? 'That file is not a Planner backup.');
+      return setMessage(result.error ?? 'That file is not a Cadence backup.');
     }
     const ok = await dialogs.confirm({
       title: 'Import backup',
@@ -63,6 +63,16 @@ export default function Settings() {
         </div>
       </section>
 
+      <section className="card settings-card" aria-label="General">
+        <h2>General</h2>
+        <Toggle
+          label="Ask before deleting"
+          hint="An “Are you sure?” before deleting plans, deadlines, special days, habits and categories. Turned off, things are deleted straight away (Ctrl+Z still brings them back)."
+          checked={state.settings.confirmDeletes}
+          onChange={(v) => dispatch({ type: 'settings/update', changes: { confirmDeletes: v } })}
+        />
+      </section>
+
       <NotificationsCard reminders={reminders} setReminders={setReminders} categories={state.categories} onMessage={setMessage} />
       <BackgroundCard background={state.settings.background} setBackground={setBackground} />
       <UpdatesCard auto={state.settings.updates.auto} setAuto={(auto) => dispatch({ type: 'settings/update', changes: { updates: { auto } } })} />
@@ -71,7 +81,7 @@ export default function Settings() {
         <h2>Your data</h2>
         <p className="subtle">
           Everything is saved automatically on this computer, separately from the app itself. When you install a new
-          version of Planner it keeps using the same data, so nothing is lost. A copy is also made every day (the last 7
+          version of Cadence it keeps using the same data, so nothing is lost. A copy is also made every day (the last 7
           days are kept).
         </p>
         {info && (
@@ -162,7 +172,7 @@ function NotificationsCard({ reminders, setReminders, categories, onMessage }) {
     setReminders({ sound: reminders.sound === gone ? 'chime' : reminders.sound, perCategory });
   };
   const test = () => {
-    if (typeof Notification !== 'undefined') new Notification('Planner reminder', { body: '🏫 Okul · 14:00–14:40 · starts in 10 min', silent: true });
+    if (typeof Notification !== 'undefined') new Notification('Cadence reminder', { body: '🏫 Okul · 14:00–14:40 · starts in 10 min', silent: true });
     playSound(reminders.sound, reminders.volume);
     onMessage('Test notification sent.');
   };
@@ -280,23 +290,23 @@ function BackgroundCard({ background, setBackground }) {
     <section className="card settings-card" aria-label="Background">
       <h2>Tray and background</h2>
       <Toggle
-        label="Show Planner in the system tray"
+        label="Show Cadence in the system tray"
         hint={linux ? 'Click the tray icon for a little view of today. On GNOME this needs the AppIndicator extension.' : 'Click the tray icon for a little view of today.'}
         checked={background.tray}
         onChange={(v) => setBackground({ tray: v, ...(!v && { keepRunning: false }) })}
       />
       <Toggle
         label="Keep running when the window is closed"
-        hint="Reminders and sounds keep working; open Planner again from the tray"
+        hint="Reminders and sounds keep working; open Cadence again from the tray"
         checked={background.keepRunning}
         disabled={!background.tray}
         onChange={(v) => setBackground({ keepRunning: v })}
       />
-      <Toggle label="Start when I log in" hint={background.tray ? 'Starts quietly in the tray' : 'Opens the Planner window'} checked={background.startOnLogin} onChange={(v) => setBackground({ startOnLogin: v })} />
+      <Toggle label="Start when I log in" hint={background.tray ? 'Starts quietly in the tray' : 'Opens the Cadence window'} checked={background.startOnLogin} onChange={(v) => setBackground({ startOnLogin: v })} />
       {linux && (
         <Toggle
-          label="Add Planner to my applications menu"
-          hint="With the Planner icon, so you can start it and pin it like any app"
+          label="Add Cadence to my applications menu"
+          hint="With the Cadence icon, so you can start it and pin it like any app"
           checked={background.menuLauncher}
           onChange={(v) => setBackground({ menuLauncher: v })}
         />
@@ -314,7 +324,7 @@ function UpdatesCard({ auto, setAuto }) {
   const text = {
     checking: 'Checking…',
     none: "You're up to date.",
-    available: `Planner ${status?.version} is available. Use the ↑ button at the top right to update.`,
+    available: `Cadence ${status?.version} is available. Use the ↑ button at the top right to update.`,
     downloading: `Downloading the update… ${status?.percent ?? 0}%`,
     ready: 'Restarting into the new version…',
     error: status?.message,

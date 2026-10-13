@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { useApp } from '../context.js';
-import { isDone, lessonAttended, tasksOn, weekLayout, isLesson } from '../lib/recurrence.js';
+import { isDone, lessonAttended, lessonMark, nextLessonMark, specialDaysOn, tasksOn, weekLayout, isLesson } from '../lib/recurrence.js';
+import { useSpecialDayActions } from '../components/specialDays.jsx';
 import { DayFlag, useDeadlineActions } from '../components/deadlineActions.jsx';
 import { addDays, formatHour, formatShort, formatTimeRange, formatWeekday, fromKey, monthOf, weekStart } from '../lib/dates.js';
 import { paths } from '../lib/routes.js';
@@ -17,6 +18,7 @@ export default function Week({ start }) {
   const { state, dispatch, navigate, today, menu } = useApp();
   const actions = usePlanActions();
   const deadlineActions = useDeadlineActions();
+  const specialActions = useSpecialDayActions();
   const startDrag = useDrag();
   const now = useNow();
   const { days, fromHour, toHour, firstHour } = weekLayout(state.plans, start);
@@ -49,20 +51,25 @@ export default function Week({ start }) {
       null,
       { label: 'Add plan…', onSelect: () => actions.create({ date }) },
       { label: 'Add deadline…', onSelect: () => deadlineActions.create({ due: date }) },
+      { label: 'Add special day…', onSelect: () => specialActions.create({ date }) },
       { label: done ? 'Mark day as not complete' : 'Mark day complete', onSelect: () => dispatch({ type: 'day/setDone', date, done: !done }) },
       null,
       { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: () => dispatch({ type: 'history/undo' }) },
     ]);
   };
 
-  const lessonMenu = (e, p, date, attended) =>
+  const lessonMenu = (e, p, date) => {
+    const mark = lessonMark(p, date);
+    const set = (attended) => dispatch({ type: 'lesson/setAttended', id: p.id, date, attended });
     menu.open(e, [
-      { label: 'Mark attended', checked: attended, onSelect: () => dispatch({ type: 'lesson/setAttended', id: p.id, date, attended: true }) },
-      { label: 'Mark absent', checked: !attended, onSelect: () => dispatch({ type: 'lesson/setAttended', id: p.id, date, attended: false }) },
+      { label: 'Attended', checked: mark === 'attended', onSelect: () => set(true) },
+      { label: 'Absent', checked: mark === 'absent', onSelect: () => set(false) },
+      { label: 'Not set (automatic)', checked: !mark, onSelect: () => set(null) },
       null,
       { label: 'Add homework…', onSelect: () => deadlineActions.homework(p, date) },
       { label: 'Open Timetable', onSelect: () => navigate(paths.timetable()) },
     ]);
+  };
 
   return (
     <div className="week-page">
@@ -106,6 +113,11 @@ export default function Week({ start }) {
               </Link>
               <span className="subtle">{tasks.length ? `${done}/${tasks.length}` : ''}</span>
               <DayFlag date={date} />
+              {specialDaysOn(state.specialDays, date).map((s) => (
+                <span key={s.id} className="week-special" title={s.title} data-testid="week-special">
+                  {s.emoji}
+                </span>
+              ))}
               <Check size="small" checked={dayDone} label={`Mark ${date} complete`} onChange={(v) => dispatch({ type: 'day/setDone', date, done: v })} />
             </div>
           );
@@ -164,8 +176,8 @@ export default function Week({ start }) {
                     className={`week-block lesson-block ${attended ? 'done' : ''}`}
                     style={style}
                     title={`${b.plan.title} · ${formatTimeRange(b.plan)}${attended ? ' · attended' : ''}`}
-                    onClick={() => dispatch({ type: 'lesson/setAttended', id: b.plan.id, date, attended: !attended })}
-                    onContextMenu={(e) => lessonMenu(e, b.plan, date, attended)}
+                    onClick={() => dispatch({ type: 'lesson/setAttended', id: b.plan.id, date, attended: nextLessonMark(b.plan, date, now) })}
+                    onContextMenu={(e) => lessonMenu(e, b.plan, date)}
                   >
                     <span className="block-title">
                       {b.plan.title}

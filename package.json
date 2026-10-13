@@ -1,9 +1,9 @@
 {
   "name": "planning-app",
-  "version": "1.5.0",
-  "desktopName": "planner.desktop",
-  "productName": "Planner",
-  "description": "A desktop planning app with browser-style tabs, categories, daily and hourly plans.",
+  "version": "1.6.0",
+  "desktopName": "cadence.desktop",
+  "productName": "Cadence",
+  "description": "Cadence: a desktop planner with browser-style tabs, lessons, deadlines, special days and habits.",
   "author": "Berkaykay",
   "main": "electron/main.cjs",
   "private": true,
@@ -28,7 +28,7 @@
   },
   "build": {
     "appId": "com.berkaykay.planner",
-    "productName": "Planner",
+    "productName": "Cadence",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -45,12 +45,12 @@
       "icon": "build/icon.png"
     },
     "nsis": {
-      "artifactName": "Planner-Setup-${version}.${ext}",
+      "artifactName": "Cadence-Setup-${version}.${ext}",
       "oneClick": true,
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Planner"
+      "shortcutName": "Cadence"
     },
     "linux": {
       "target": [
@@ -58,7 +58,7 @@
       ],
       "category": "Office",
       "syncDesktopName": true,
-      "artifactName": "Planner-${version}-linux.${ext}"
+      "artifactName": "Cadence-${version}-linux.${ext}"
     },
     "publish": [
       {
@@ -67,7 +67,8 @@
         "repo": "Planning-App",
         "releaseType": "release"
       }
-    ]
+    ],
+    "executableName": "cadence"
   },
   "dependencies": {
     "electron-updater": "^6.8.9"

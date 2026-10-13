@@ -10,8 +10,8 @@ export default function NotFound({ path }) {
         There is no page at <code>{SCHEME + path}</code>.
       </p>
       <p>
-        Try <code>planner://dashboard</code>, <code>planner://calendar</code>, <code>planner://day/today</code> or{' '}
-        <code>planner://categories</code>.
+        Try <code>cadence://dashboard</code>, <code>cadence://calendar</code>, <code>cadence://day/today</code> or{' '}
+        <code>cadence://categories</code>.
       </p>
       <Link to="dashboard" className="button primary">
         Go to Dashboard

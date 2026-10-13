@@ -35,12 +35,12 @@ async function goTo(address) {
 
 test('week view → Month view opens the month of that week with its day selected', async () => {
   await start();
-  await goTo('planner://week/2026-03-02');
+  await goTo('cadence://week/2026-03-02');
   await page.getByRole('link', { name: 'Month view' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('March 2026');
   await expect(page.getByTestId('cell-2026-03-05')).toHaveAttribute('aria-selected', 'true');
   // A week across two months opens the month its Thursday is in.
-  await goTo('planner://week/2026-03-30');
+  await goTo('cadence://week/2026-03-30');
   await page.getByRole('link', { name: 'Month view' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('April 2026');
   await expect(page.getByTestId('cell-2026-04-02')).toHaveAttribute('aria-selected', 'true');
@@ -113,7 +113,7 @@ test('edit and delete buttons are large and always visible', async () => {
 test('deadlines: add from the calendar, see them everywhere until done, edit any time', async () => {
   await start(normalizeData({ categories: [{ id: 's', name: 'School', color: '#4f9d7e' }] }));
   const due = addDays(today, 3);
-  await goTo(`planner://calendar/${due}`);
+  await goTo(`cadence://calendar/${due}`);
   await page.getByTestId(`cell-${due}`).click({ button: 'right' });
   await menuItem('Add deadline…').click();
   await expect(dialog().getByLabel('Due date')).toHaveValue(due);
@@ -133,7 +133,7 @@ test('deadlines: add from the calendar, see them everywhere until done, edit any
   // It shows on every day until it's due, but not after.
   await sidebar().getByRole('link', { name: 'Day Planner' }).click();
   await expect(page.getByTestId('due-soon')).toContainText('Physics report');
-  await goTo(`planner://day/${addDays(due, 1)}`);
+  await goTo(`cadence://day/${addDays(due, 1)}`);
   await expect(page.getByTestId('due-soon')).toHaveCount(0);
 
   // And in its category's page.
@@ -159,7 +159,7 @@ test('deadlines: add from the calendar, see them everywhere until done, edit any
 
   // In the calendar the flag turns green and the day panel lists it under "Finished", not as due.
   const tomorrow = addDays(today, 1);
-  await goTo(`planner://calendar/${tomorrow}`);
+  await goTo(`cadence://calendar/${tomorrow}`);
   await expect(page.getByTestId(`cell-${tomorrow}`).getByTestId('cell-flag')).toHaveCount(0);
   await expect(page.getByTestId(`cell-${tomorrow}`).getByTestId('cell-flag-done')).toBeVisible();
   await expect(page.getByTestId('day-deadlines')).toHaveCount(0);
@@ -170,7 +170,7 @@ test('deadlines: add from the calendar, see them everywhere until done, edit any
   await expect(page.getByTestId('day-deadlines')).toContainText('Physics report');
 
   // On its due day it's listed in the Day Planner's All day section (and not under "Due soon").
-  await goTo(`planner://day/${tomorrow}`);
+  await goTo(`cadence://day/${tomorrow}`);
   await expect(page.getByTestId('due-here')).toContainText('Physics report');
   await expect(page.getByTestId('due-soon')).toHaveCount(0);
 });
@@ -209,7 +209,7 @@ test('week view always shows all 24 hours, even after moving the only early plan
   await expect(hours).toHaveCount(24);
   for (const h of [0, 3, 6]) await expect(page.getByTestId(`slot-${today}-${h}`)).toHaveCount(1);
   // Reopening the week starts at 07:00 now that nothing is earlier.
-  await goTo('planner://dashboard');
+  await goTo('cadence://dashboard');
   await sidebar().getByRole('link', { name: 'Week' }).click();
   await expect(page.getByTestId(`slot-${today}-7`)).toBeInViewport();
   await expect(page.getByTestId(`slot-${today}-0`)).not.toBeInViewport();
