@@ -7,15 +7,22 @@ const { createSounds } = require('./sounds.cjs');
 const { setupUpdates } = require('./updates.cjs');
 const { createTray } = require('./tray.cjs');
 const launcher = require('./launcher.cjs');
-
-// On Linux, Cadence runs through XWayland: native Wayland doesn't let an app place its own windows,
-// and the tray popup has to open right at the tray. CADENCE_WAYLAND=1 keeps it native.
-if (process.platform === 'linux' && process.env.CADENCE_WAYLAND !== '1') app.commandLine.appendSwitch('ozone-platform', 'x11');
+const { applyDisplayMode, relaunch, saveMode } = require('./display.cjs');
 
 // PLANNER_DATA_DIR lets tests (or power users) point the app at another data folder. Electron's
 // own files then go next to it, so test runs never share a profile (or the single-instance lock).
 const dataDir = process.env.PLANNER_DATA_DIR || app.getPath('userData');
 if (process.env.PLANNER_DATA_DIR) app.setPath('userData', `${process.env.PLANNER_DATA_DIR}-electron`);
+// Linux: X11 mode with software rendering (so the tray popup can sit at the tray), or native
+// Wayland. See display.cjs.
+const display = applyDisplayMode(app, {
+  onFallback: () => {
+    // Tests check the fallback without starting a second app.
+    if (process.env.CADENCE_TEST_NO_RELAUNCH === '1') return void (global.cadenceFellBack = true);
+    relaunch(app);
+    app.exit(0);
+  },
+});
 // The app used to be called Planner: bring its data over from the old folder on first start.
 try {
   const legacy = process.env.CADENCE_LEGACY_DATA_DIR ?? (process.env.PLANNER_DATA_DIR ? null : path.join(app.getPath('appData'), 'Planner'));
@@ -246,6 +253,19 @@ ipcMain.on('window:titleBarOverlay', (_event, { color, symbolColor }) => {
   }
 });
 ipcMain.on('window:show', () => showMain());
+
+// Linux display mode (Settings → Tray and background). Takes effect after a restart.
+ipcMain.handle('display:get', () => ({ mode: display.mode, saved: display.saved ?? (display.mode === 'native' ? null : 'x11') }));
+ipcMain.handle('display:set', (_event, mode) => {
+  if (process.platform !== 'linux' || (mode !== 'x11' && mode !== 'wayland')) return false;
+  saveMode(app.getPath('userData'), mode);
+  display.saved = mode;
+  return true;
+});
+ipcMain.on('app:restart', () => {
+  relaunch(app);
+  quit();
+});
 
 // Settings that the main process acts on.
 ipcMain.on('app:settings', (_event, { background: bg, updates: up }) => {

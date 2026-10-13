@@ -60,3 +60,11 @@ export const sounds = {
 
 export const miniBridge = bridge?.mini ?? null;
 export const appVersion = () => (typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '');
+
+// Linux only: how Cadence draws its windows ('x11' places the tray popup at the tray, 'wayland' is native).
+// get() resolves with { mode (this run), saved (next start) }, or null outside Linux.
+export const display = {
+  get: () => bridge?.display?.get() ?? Promise.resolve(null),
+  set: (mode) => bridge?.display?.set(mode) ?? Promise.resolve(false),
+};
+export const restartApp = () => bridge?.restart?.();

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context.js';
 import { BUILTIN_SOUNDS, THEMES } from '../lib/store.js';
-import { appVersion, dataInfo, exportData, importData, openDataFolder, sounds, updates } from '../lib/persistence.js';
+import { appVersion, dataInfo, display, exportData, importData, openDataFolder, restartApp, sounds, updates } from '../lib/persistence.js';
 import { playSound, soundLabel } from '../lib/sounds.js';
 
 const REMINDER_MINUTES = [0, 5, 10, 15, 30, 60];
@@ -311,7 +311,41 @@ function BackgroundCard({ background, setBackground }) {
           onChange={(v) => setBackground({ menuLauncher: v })}
         />
       )}
+      {linux && <DisplayModeRow />}
     </section>
+  );
+}
+
+// Linux: X11 mode lets the tray popup open right at the tray icon (drawn without the GPU, which
+// crashes through XWayland on some drivers); Wayland mode is native and the system places the popup.
+function DisplayModeRow() {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    display.get().then(setInfo);
+  }, []);
+  if (!info) return null;
+  const pending = info.saved !== info.mode;
+  const change = (on) => {
+    const mode = on ? 'x11' : 'wayland';
+    const before = info.saved;
+    setInfo((i) => ({ ...i, saved: mode }));
+    display.set(mode).then((ok) => ok || setInfo((i) => ({ ...i, saved: before })));
+  };
+  return (
+    <>
+      <Toggle
+        label="Open the tray popup right at the tray"
+        hint="Uses X11 mode with software drawing. Turn it off if Cadence looks blurry or won't start; the system then decides where the popup opens."
+        checked={info.saved === 'x11'}
+        onChange={change}
+      />
+      {pending && (
+        <div className="setting-row" role="status" data-testid="display-restart">
+          <span className="subtle">Restart Cadence to apply this.</span>
+          <button onClick={() => restartApp()}>Restart now</button>
+        </div>
+      )}
+    </>
   );
 }
 

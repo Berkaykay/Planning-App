@@ -24,6 +24,10 @@ Built with **Electron + React** (bundled by Vite). All data is saved locally in 
 
 **Coming from Planner?** Cadence picks up your data automatically on first start (from the old `Planner` data folder; the old folder is left as a backup), and replaces the old menu entry.
 
+**Linux display mode.** <a id="linux-display-mode"></a>Wayland doesn't let apps place their own windows, so by default Cadence runs in **X11 mode** (through XWayland, drawn in software) to open the tray popup right at the tray. If you prefer native Wayland (sharper on fractional scaling; the system then decides where the popup opens), turn off **Settings → Tray and background → Open the tray popup right at the tray** and restart. If Cadence's graphics ever crash in X11 mode, it switches to Wayland mode by itself and restarts. To force a mode for one start, use `CADENCE_WAYLAND=1` or `CADENCE_X11=1`, e.g. `CADENCE_WAYLAND=1 ~/Applications/Cadence-1.6.1-linux.AppImage`.
+
+**Cadence 1.6.0 closes right after starting on Linux?** That version used the graphics card in X11 mode, which crashes with some Mesa drivers (seen on Nobara / Fedora 44). Start it once with `CADENCE_WAYLAND=1 /path/to/Cadence-1.6.0-linux.AppImage`, then use the **↑** button to update to 1.6.1 or newer, or download the new AppImage from the Releases page.
+
 **Updates install themselves (from 1.5 on):** when a new version is out, a small **↑ 1.5.1**-style button appears at the top right of the window. Click it and choose **Update and restart**. Your plans are stored separately from the app, so they're kept as they are. See [Where your data is stored](#where-your-data-is-stored).
 
 ### Run from source (for developers)
@@ -138,7 +142,7 @@ Each filled cell becomes a weekly lesson in the *School* category, created autom
 - set **quiet hours** (for example 23:00–07:00) when nothing plays or pops up.
 
 **Tray and background** (Settings → Tray and background, all off by default):
-- **Show Cadence in the system tray.** Click the tray icon and a small "today" window slides out of the tray corner: your progress, what's up next, today's plans to check off with a quick-add box and *Add deadline*, lessons, deadlines, upcoming special days, a **Tomorrow** preview and a 25-minute **focus timer** (it keeps running when the popup is closed and notifies you at the end). **Open Cadence** is at its top left. Right-click the tray icon for *Open Cadence* and *Quit*. On GNOME the tray needs the AppIndicator extension; KDE shows it directly. (On Linux, Cadence runs through XWayland so it can place this popup; start it with `CADENCE_WAYLAND=1` to run natively on Wayland.)
+- **Show Cadence in the system tray.** Click the tray icon and a small "today" window slides out of the tray corner: your progress, what's up next, today's plans to check off with a quick-add box and *Add deadline*, lessons, deadlines, upcoming special days, a **Tomorrow** preview and a 25-minute **focus timer** (it keeps running when the popup is closed and notifies you at the end). **Open Cadence** is at its top left. Right-click the tray icon for *Open Cadence* and *Quit*. On GNOME the tray needs the AppIndicator extension; KDE shows it directly. (On Linux, the popup can only sit right at the tray in X11 mode; see [Linux display mode](#linux-display-mode).)
   <img src="docs/tray-popup.png" alt="Tray popup" width="300">
 - **Keep running when the window is closed**, so reminders and sounds keep working; open the window again from the tray.
 - **Start when I log in** (quietly into the tray).
