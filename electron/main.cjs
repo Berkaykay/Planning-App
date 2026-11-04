@@ -7,7 +7,7 @@ const { createSounds } = require('./sounds.cjs');
 const { setupUpdates } = require('./updates.cjs');
 const { createTray } = require('./tray.cjs');
 const launcher = require('./launcher.cjs');
-const { applyDisplayMode, relaunch, saveMode } = require('./display.cjs');
+const { applyDisplayMode, relaunch, startCopy, saveMode, X11_FLAG } = require('./display.cjs');
 
 // PLANNER_DATA_DIR lets tests (or power users) point the app at another data folder. Electron's
 // own files then go next to it, so test runs never share a profile (or the single-instance lock).
@@ -23,6 +23,13 @@ const display = applyDisplayMode(app, {
     app.exit(0);
   },
 });
+// X11 mode on a Wayland desktop needs the flag on the real command line: start again with it, before
+// anything else runs (the single-instance lock below would turn the new copy away).
+if (display.restartForX11) {
+  startCopy([X11_FLAG]);
+  app.exit(0);
+  return;
+}
 // The app used to be called Planner: bring its data over from the old folder on first start.
 try {
   const legacy = process.env.CADENCE_LEGACY_DATA_DIR ?? (process.env.PLANNER_DATA_DIR ? null : path.join(app.getPath('appData'), 'Planner'));
