@@ -12,7 +12,12 @@ export async function launchApp(dataDir, env = {}) {
   const args = ['.'];
   // Chromium's sandbox is unavailable when running as root or on CI runners.
   if (process.getuid?.() === 0 || process.env.CI) args.push('--no-sandbox');
-  const app = await electron.launch({ args, env: { ...process.env, PLANNER_DATA_DIR: dataDir, ...env } });
+  // Run like under xvfb even on a Wayland desktop: X11 mode would otherwise restart Cadence with
+  // --ozone-platform=x11 (see electron/display.cjs), and Playwright can't follow the new copy.
+  const base = { ...process.env };
+  delete base.WAYLAND_DISPLAY;
+  delete base.XDG_SESSION_TYPE;
+  const app = await electron.launch({ args, env: { ...base, PLANNER_DATA_DIR: dataDir, ...env } });
   const page = await app.firstWindow();
   await page.waitForSelector('.app');
   return { app, page };
